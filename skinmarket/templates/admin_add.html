@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Каталог{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin') }}">&larr; Админ-панель</a></p>
+<div class="head-row"><h1>Каталог: игры, категории, скины</h1></div>
+
+<h2>Игры</h2>
+<div class="game-grid">
+  {% for g_ in games %}
+  <div class="card game-card">
+    <div class="game-head">
+      {% if g_.logo %}<img class="logo-img" src="{{ g_.logo }}" alt="{{ g_.game_name }}">
+      {% else %}<span class="logo-img ph">{{ g_.game_name|initials }}</span>{% endif %}
+      <div>
+        <b>{{ g_.game_name }}</b>
+        <div class="muted small">категорий: {{ g_.cats|length }}</div>
+      </div>
+    </div>
+    <div class="tags">
+      {% for c in g_.cats %}<span class="tag">{{ c }}</span>{% else %}<span class="muted small">Категорий пока нет</span>{% endfor %}
+    </div>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="kind" value="category">
+      <input type="hidden" name="game" value="{{ g_.game_id }}">
+      <input type="text" name="name" maxlength="60" placeholder="Новая категория" required>
+      <button class="btn btn-sm" type="submit">+</button>
+    </form>
+    <form method="post" enctype="multipart/form-data" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="kind" value="game_logo">
+      <input type="hidden" name="game" value="{{ g_.game_id }}">
+      <input type="file" name="logo" accept="image/png,image/jpeg,image/gif,image/webp" required>
+      <button class="btn btn-ghost btn-sm" type="submit">Сменить логотип</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="card empty">Игр пока нет. Добавьте первую справа.</div>
+  {% endfor %}
+
+  <div class="card game-card add-card">
+    <h3>Новая игра</h3>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="kind" value="game">
+      <label>Название<input type="text" name="name" maxlength="60" required></label>
+      <label>Логотип (PNG, JPG, GIF, WEBP до 5 МБ)
+        <input type="file" name="logo" id="game-logo" accept="image/png,image/jpeg,image/gif,image/webp">
+      </label>
+      <img id="game-logo-preview" class="preview" alt="Предпросмотр" hidden>
+      <button class="btn btn-sm" type="submit">Добавить игру</button>
+    </form>
+  </div>
+</div>
+
+<h2>Редкости</h2>
+<div class="card">
+  <div class="tags">
+    {% for r in rarities %}<span class="tag tag-{{ r.rarity_name|rarity_cls }}">{{ r.rarity_name }}</span>{% endfor %}
+  </div>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="kind" value="rarity">
+    <input type="text" name="name" maxlength="40" placeholder="Новая редкость" required>
+    <button class="btn btn-sm" type="submit">Добавить</button>
+  </form>
+</div>
+
+<h2>Добавить скин в каталог</h2>
+<div class="card">
+  {% if games %}
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="kind" value="item">
+    <div class="row">
+      <label>Игра
+        <select name="game" id="item-game" required>
+          <option value="">Выберите…</option>
+          {% for g_ in games %}<option value="{{ g_.game_id }}">{{ g_.game_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Категория
+        <select name="category" id="item-category" required>
+          <option value="">Сначала выберите игру</option>
+          {% for c in categories %}<option value="{{ c.category_id }}" data-game="{{ c.game_id }}">{{ c.category_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Редкость
+        <select name="rarity" required>
+          {% for r in rarities %}<option value="{{ r.rarity_id }}">{{ r.rarity_name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>Название скина<input type="text" name="name" maxlength="120" required></label>
+    <label>Описание<textarea name="description" rows="2" maxlength="1000"></textarea></label>
+    <div class="row">
+      <label>Картинка: файл
+        <input type="file" name="image_file" id="item-file" accept="image/png,image/jpeg,image/gif,image/webp">
+      </label>
+      <label>или ссылка
+        <input type="url" name="image_url" maxlength="240" placeholder="https://…">
+      </label>
+    </div>
+    <img id="item-preview" class="preview" alt="Предпросмотр" hidden>
+    <div class="row">
+      <label>Цена, ₽
+        <input type="text" inputmode="decimal" name="price" placeholder="например, 1500">
+        <span class="hint">С ценой скин сразу появится в каталоге. Без цены он только попадёт в список ниже.</span>
+      </label>
+      <label>Количество<input type="number" name="qty" min="1" max="9999" value="1"></label>
+    </div>
+    <button class="btn" type="submit">Добавить скин</button>
+  </form>
+  {% else %}
+  <p class="muted">Сначала добавьте игру.</p>
+  {% endif %}
+</div>
+
+<div class="head-row">
+  <h2>Скины в каталоге <span class="muted small">({{ items_total }})</span></h2>
+  <form method="get" class="inline-form">
+    <select name="game" aria-label="Фильтр по игре" onchange="this.form.submit()">
+      <option value="">Все игры</option>
+      {% for g_ in games %}<option value="{{ g_.game_id }}" {{ 'selected' if f_game == g_.game_id }}>{{ g_.game_name }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+<div class="card">
+  {% if items %}
+  <table class="table">
+    <thead><tr><th>Картинка</th><th>Скин</th><th>Игра · категория</th><th>Редкость</th><th>Продажа</th><th>Заменить картинку</th></tr></thead>
+    <tbody>
+    {% for i in items %}
+      <tr>
+        <td>{% if i.image_url %}<img class="thumb" src="{{ i.image_url }}" alt="{{ i.item_name }}">{% else %}<span class="thumb ph">{{ i.item_name|initials }}</span>{% endif %}</td>
+        <td>{{ i.item_name }}</td>
+        <td>{{ i.game_name }} · {{ i.category_name }}</td>
+        <td><span class="tag tag-{{ i.rarity_name|rarity_cls }}">{{ i.rarity_name }}</span></td>
+        <td class="sale-cell">
+          {% if i.sale %}<div class="small"><span class="tag tag-ok">в продаже</span> {{ i.sale.qty }} шт. от {{ i.sale.min|money }}</div>
+          {% else %}<div class="small"><span class="tag tag-bad">нет на витрине</span></div>{% endif %}
+          <form method="post" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="kind" value="item_listing">
+            <input type="hidden" name="item_id" value="{{ i.item_id }}">
+            <input type="hidden" name="filter_game" value="{{ f_game or '' }}">
+            <input type="text" inputmode="decimal" name="price" placeholder="Цена, ₽" size="8" required aria-label="Цена">
+            <input type="number" name="qty" value="1" min="1" max="9999" aria-label="Количество" style="max-width:76px">
+            <button class="btn btn-sm" type="submit">Выставить</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" enctype="multipart/form-data" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="kind" value="item_image">
+            <input type="hidden" name="item_id" value="{{ i.item_id }}">
+            <input type="hidden" name="filter_game" value="{{ f_game or '' }}">
+            <input type="file" name="image_file" accept="image/png,image/jpeg,image/gif,image/webp">
+            <input type="url" name="image_url" maxlength="240" placeholder="или ссылка">
+            <button class="btn btn-ghost btn-sm" type="submit">Сохранить</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if items_total > items|length %}<p class="muted small">Показаны последние {{ items|length }}. Выберите игру в фильтре, чтобы сузить список.</p>{% endif %}
+  {% else %}
+  <p class="muted">Скинов пока нет.</p>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/forms.js') }}"></script>
+<script>
+  bindPreview(document.getElementById('game-logo'), document.getElementById('game-logo-preview'));
+  var itemGame = document.getElementById('item-game');
+  if (itemGame) {
+    bindCategoryFilter(itemGame, document.getElementById('item-category'));
+    bindPreview(document.getElementById('item-file'), document.getElementById('item-preview'));
+  }
+</script>
+{% endblock %}

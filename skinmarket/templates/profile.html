@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<h1>Профиль</h1>
+<div class="two-col">
+  <div class="card">
+    <h2>{{ user.login }}</h2>
+    <p class="muted">{{ user.email }} · роль: {{ user.role_name }}</p>
+    <div class="price-big">{{ user.balance|money }}</div>
+    <p class="muted small">Демо-режим: пополнение и вывод не связаны с реальными платежами.</p>
+
+    <form method="post" action="{{ url_for('topup') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" inputmode="decimal" name="amount" placeholder="Сумма, ₽" required>
+      <button class="btn btn-sm" type="submit">Пополнить</button>
+    </form>
+    <form method="post" action="{{ url_for('withdraw') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" inputmode="decimal" name="amount" placeholder="Сумма, ₽" required>
+      <button class="btn btn-ghost btn-sm" type="submit">Вывести</button>
+    </form>
+
+    {% if user.role_name == 'Покупатель' %}
+    <hr>
+    <p>Хотите продавать скины?</p>
+    <form method="post" action="{{ url_for('become_seller') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">Стать продавцом</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>История операций</h2>
+    {% if transactions %}
+    <table class="table">
+      <thead><tr><th>Дата</th><th>Операция</th><th>Заказ</th><th class="num">Сумма</th></tr></thead>
+      <tbody>
+      {% for t in transactions %}
+        <tr>
+          <td>{{ t.created_at|dt }}</td>
+          <td>{{ t.trans_type }}</td>
+          <td>{{ t.order_id or '—' }}</td>
+          <td class="num {{ 'pos' if t.amount > 0 else 'neg' }}">{{ t.amount|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">Операций пока нет.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Админ-панель</h1>
+  <a class="btn" href="{{ url_for('admin_catalog') }}">Справочники: игры, категории, редкости</a>
+</div>
+
+<div class="stats">
+  <div class="card stat"><div class="muted">Пользователи</div><b>{{ stats.users }}</b></div>
+  <div class="card stat"><div class="muted">Активные объявления</div><b>{{ stats.listings }}</b></div>
+  <div class="card stat"><div class="muted">Заказы</div><b>{{ stats.orders }}</b></div>
+  <div class="card stat"><div class="muted">Оборот (выполненные)</div><b>{{ stats.turnover|money }}</b></div>
+</div>
+
+<div class="card">
+  <h2>Пользователи</h2>
+  <table class="table">
+    <thead><tr><th>№</th><th>Логин</th><th>Email</th><th>Баланс</th><th>Роль</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr>
+        <td>{{ u.user_id }}</td><td>{{ u.login }}</td><td>{{ u.email }}</td><td>{{ u.balance|money }}</td>
+        <td>
+          {% if u.user_id == user.user_id %}{{ u.role_name }}
+          {% else %}
+          <form method="post" action="{{ url_for('admin_role', user_id=u.user_id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="role_id" aria-label="Роль">
+              {% for r in roles %}<option value="{{ r.role_id }}" {{ 'selected' if r.role_id == u.role_id }}>{{ r.role_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-ghost btn-sm" type="submit">Ок</button>
+          </form>
+          {% endif %}
+        </td>
+        <td>{% if u.blocked %}<span class="tag tag-bad">заблокирован</span>{% else %}<span class="tag">активен</span>{% endif %}</td>
+        <td>
+          {% if u.user_id != user.user_id %}
+          <form method="post" action="{{ url_for('admin_block', user_id=u.user_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">{{ 'Разблокировать' if u.blocked else 'Заблокировать' }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Объявления (последние 50)</h2>
+  <table class="table">
+    <thead><tr><th>№</th><th>Товар</th><th>Игра</th><th>Продавец</th><th>Цена</th><th>Кол-во</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for l in listings %}
+      <tr>
+        <td>{{ l.listing_id }}</td>
+        <td><a href="{{ url_for('listing_page', listing_id=l.listing_id) }}">{{ l.item_name }}</a></td>
+        <td>{{ l.game_name }}</td><td>{{ l.seller_login }}</td><td>{{ l.price|money }}</td><td>{{ l.qty }}</td><td>{{ l.status_name }}</td>
+        <td>
+          {% if l.status_name != 'Снято' %}
+          <form method="post" action="{{ url_for('admin_listing_remove', listing_id=l.listing_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Снять</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Заказы (последние 50)</h2>
+  <table class="table">
+    <thead><tr><th>№</th><th>Товар</th><th>Покупатель</th><th>Продавец</th><th>Сумма</th><th>Дата</th><th>Статус</th></tr></thead>
+    <tbody>
+    {% for o in orders %}
+      <tr>
+        <td>{{ o.order_id }}</td><td>{{ o.item_name }}</td><td>{{ o.buyer_login }}</td><td>{{ o.seller_login }}</td>
+        <td>{{ o.order_sum|money }}</td><td>{{ o.created_at|dt }}</td><td>{{ o.status_name }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

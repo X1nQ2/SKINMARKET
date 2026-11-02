@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Корзина{% endblock %}
+{% block content %}
+<h1>Корзина</h1>
+{% if items %}
+<div class="card">
+  <table class="table">
+    <thead><tr><th>Товар</th><th>Продавец</th><th>Цена</th><th>Кол-во</th><th>Сумма</th><th></th></tr></thead>
+    <tbody>
+    {% for i in items %}
+      <tr>
+        <td><a href="{{ url_for('listing_page', listing_id=i.listing_id) }}">{{ i.item_name }}</a>
+            {% if not i.ok %}<div class="small err">Недоступно в таком количестве</div>{% endif %}</td>
+        <td>{{ i.seller_login }}</td>
+        <td>{{ i.price|money }}</td>
+        <td>{{ i.cart_qty }}</td>
+        <td>{{ i.line|money }}</td>
+        <td>
+          <form method="post" action="{{ url_for('cart_remove', listing_id=i.listing_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Убрать</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="cart-total">
+    <div>Итого: <b>{{ total|money }}</b> · Ваш баланс: {{ user.balance|money }}</div>
+    <form method="post" action="{{ url_for('cart_checkout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit" {{ 'disabled' if not all_ok }}>Оплатить с баланса</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="card empty">Корзина пуста. <a href="{{ url_for('catalog') }}">Перейти в каталог</a></div>
+{% endif %}
+{% endblock %}

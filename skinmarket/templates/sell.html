@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Мои объявления{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Мои объявления</h1>
+  <div>
+    <a class="btn btn-ghost" href="{{ url_for('sales') }}">Заказы покупателей</a>
+    <a class="btn" href="{{ url_for('sell_new') }}">Новое объявление</a>
+  </div>
+</div>
+{% if listings %}
+<div class="card">
+  <table class="table">
+    <thead><tr><th>Товар</th><th>Игра</th><th>Статус</th><th>Цена и количество</th><th></th></tr></thead>
+    <tbody>
+    {% for l in listings %}
+      <tr>
+        <td><a href="{{ url_for('listing_page', listing_id=l.listing_id) }}">{{ l.item_name }}</a>
+            <div><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span></div></td>
+        <td>{{ l.game_name }}</td>
+        <td>{{ l.status_name }}</td>
+        <td>
+          <form method="post" action="{{ url_for('sell_update', listing_id=l.listing_id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" inputmode="decimal" name="price" value="{{ l.price }}" size="8" aria-label="Цена">
+            <input type="number" name="qty" value="{{ l.qty }}" min="0" max="9999" aria-label="Количество">
+            <button class="btn btn-sm" type="submit">Сохранить</button>
+          </form>
+        </td>
+        <td>
+          {% if l.status_name != 'Снято' %}
+          <form method="post" action="{{ url_for('sell_remove', listing_id=l.listing_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Снять</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty">Объявлений пока нет. <a href="{{ url_for('sell_new') }}">Создать первое</a></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Мои заказы{% endblock %}
+{% block content %}
+<h1>Мои заказы</h1>
+{% if orders %}
+<div class="card">
+  <table class="table">
+    <thead><tr><th>№</th><th>Товар</th><th>Продавец</th><th>Кол-во</th><th>Сумма</th><th>Дата</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for o in orders %}
+      <tr>
+        <td>{{ o.order_id }}</td>
+        <td><a href="{{ url_for('listing_page', listing_id=o.listing_id) }}">{{ o.item_name }}</a></td>
+        <td>{{ o.seller_login }}</td>
+        <td>{{ o.qty }}</td>
+        <td>{{ o.order_sum|money }}</td>
+        <td>{{ o.created_at|dt }}</td>
+        <td><span class="tag">{{ o.status_name }}</span></td>
+        <td class="actions">
+          {% if o.can_cancel %}
+          <form method="post" action="{{ url_for('order_cancel', order_id=o.order_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Отменить</button>
+          </form>
+          {% endif %}
+          {% if o.can_review %}
+          <form method="post" action="{{ url_for('order_review', order_id=o.order_id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="rating" aria-label="Оценка">
+              {% for n in (5, 4, 3, 2, 1) %}<option value="{{ n }}">{{ n }} ★</option>{% endfor %}
+            </select>
+            <input type="text" name="text" maxlength="500" placeholder="Отзыв (необязательно)">
+            <button class="btn btn-sm" type="submit">Отправить</button>
+          </form>
+          {% elif o.reviewed %}<span class="muted small">Отзыв оставлен</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty">Заказов пока нет. <a href="{{ url_for('catalog') }}">Перейти в каталог</a></div>
+{% endif %}
+{% endblock %}

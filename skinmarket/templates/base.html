@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SKINMARKET{% endblock %} — SKINMARKET</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="logo" href="{{ url_for('catalog') }}">SKIN<span>MARKET</span></a>
+    <nav class="nav">
+      <a href="{{ url_for('catalog') }}">Каталог</a>
+      {% if user %}
+        <a href="{{ url_for('cart') }}">Корзина{% if cart_count %} <b class="badge">{{ cart_count }}</b>{% endif %}</a>
+        <a href="{{ url_for('orders') }}">Мои заказы</a>
+        {% if user.role_name in (ROLE_SELLER, ROLE_ADMIN) %}
+          <a href="{{ url_for('sell') }}">Продажи</a>
+        {% endif %}
+        {% if user.role_name == ROLE_ADMIN %}
+          <a href="{{ url_for('admin') }}">Админка</a>
+        {% endif %}
+      {% endif %}
+    </nav>
+    <div class="account">
+      {% if user %}
+        <a class="balance" href="{{ url_for('profile') }}" title="Профиль и баланс">{{ user.login }} · {{ user.balance|money }}</a>
+        <form method="post" action="{{ url_for('logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost btn-sm" type="submit">Выйти</button>
+        </form>
+      {% else %}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('login') }}">Войти</a>
+        <a class="btn btn-sm" href="{{ url_for('register') }}">Регистрация</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <div class="footer-brand">SKINMARKET</div>
+      <p>Маркетплейс игровых скинов. Деньги удерживаются до выполнения заказа, а заказ можно отменить, пока он в работе.</p>
+      <p><a href="mailto:support@skinmarket.example">support@skinmarket.example</a><br>
+         +7 (000) 000-00-00 · ежедневно с 9:00 до 21:00</p>
+    </div>
+    <div class="footer-col">
+      <h4>Магазин</h4>
+      <a href="{{ url_for('catalog') }}">Каталог</a>
+      <a href="{{ url_for('cart') }}">Корзина</a>
+      <a href="{{ url_for('orders') }}">Мои заказы</a>
+      <a href="{{ url_for('profile') }}">Профиль и баланс</a>
+    </div>
+    <div class="footer-col">
+      <h4>Покупателям</h4>
+      <a href="{{ url_for('delivery') }}">Оплата и сделка</a>
+      <a href="{{ url_for('contacts') }}">Контакты и поддержка</a>
+      <a href="{{ url_for('terms') }}">Пользовательское соглашение</a>
+      <a href="{{ url_for('privacy') }}">Политика конфиденциальности</a>
+    </div>
+  </div>
+  <div class="container footer-copy">© 2026 SKINMARKET · учебный проект, оплата работает на демо-балансе</div>
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

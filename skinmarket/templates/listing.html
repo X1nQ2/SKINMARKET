@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ l.item_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('catalog') }}">&larr; Назад в каталог</a></p>
+<div class="detail">
+  <div class="card detail-img rarity-{{ l.rarity_name|rarity_cls }}">
+    {% if l.image_url %}<img src="{{ l.image_url }}" alt="{{ l.item_name }}">
+    {% else %}<span class="ph big">{{ l.item_name|initials }}</span>{% endif %}
+  </div>
+  <div class="card detail-info">
+    <div class="skin-game">{{ l.game_name }} · {{ l.category_name }}</div>
+    <h1>{{ l.item_name }}</h1>
+    <p><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span>
+       <span class="tag">{{ l.status_name }}</span></p>
+    {% if l.item_desc %}<p>{{ l.item_desc }}</p>{% endif %}
+    <div class="price-big">{{ l.price|money }}</div>
+    <p class="muted">В наличии: {{ l.qty }} шт.</p>
+
+    {% if not available %}
+      <div class="flash flash-error">Объявление недоступно для покупки.</div>
+    {% elif not user %}
+      <p><a class="btn" href="{{ url_for('login', next=request.path) }}">Войдите, чтобы купить</a></p>
+    {% elif user.user_id == l.seller_id %}
+      <p class="muted">Это ваше объявление.</p>
+    {% else %}
+      <form method="post" class="buy-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Количество
+          <input type="number" name="qty" value="1" min="1" max="{{ l.qty }}">
+        </label>
+        <button class="btn" type="submit" formaction="{{ url_for('buy', listing_id=l.listing_id) }}">Купить сейчас</button>
+        <button class="btn btn-ghost" type="submit" formaction="{{ url_for('cart_add', listing_id=l.listing_id) }}">В корзину</button>
+      </form>
+      <p class="muted small">Деньги удерживаются на платформе до тех пор, пока продавец не выполнит заказ.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Продавец: {{ l.seller_login }}</h2>
+  {% if rating is not none %}
+    <p>Рейтинг: <b>{{ rating }}</b> из 5 ({{ reviews_count }} отзывов)</p>
+    {% for r in reviews %}
+      <div class="review">
+        <b>{{ r.buyer_login }}</b> · {{ '★' * r.rating }}{{ '☆' * (5 - r.rating) }} · <span class="muted">{{ r.created_at|dt }}</span>
+        {% if r.review_text %}<div>{{ r.review_text }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">Отзывов пока нет.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Каталог{% endblock %}
+{% block content %}
+{% set gnames = {} %}{% for g_ in games %}{% set _ = gnames.update({g_.game_id: g_.game_name}) %}{% endfor %}
+<h1>Каталог скинов</h1>
+<div class="layout">
+  <aside class="filters card">
+    <form method="get" action="{{ url_for('catalog') }}">
+      <label>Поиск
+        <input type="search" name="q" value="{{ q }}" maxlength="60" placeholder="Название или игра">
+      </label>
+      <label>Игра
+        <select name="game" id="f-game">
+          <option value="">Все игры</option>
+          {% for g_ in games %}<option value="{{ g_.game_id }}" {{ 'selected' if f_game == g_.game_id }}>{{ g_.game_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Категория
+        <select name="category" id="f-category">
+          <option value="">Все категории</option>
+          {% for c in categories %}<option value="{{ c.category_id }}" data-game="{{ c.game_id }}" data-name="{{ c.category_name }}" data-gamename="{{ gnames[c.game_id] }}" {{ 'selected' if f_category == c.category_id }}>{{ c.category_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Редкость
+        <select name="rarity">
+          <option value="">Любая</option>
+          {% for r in rarities %}<option value="{{ r.rarity_id }}" {{ 'selected' if f_rarity == r.rarity_id }}>{{ r.rarity_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="row">
+        <label>Цена от<input type="text" inputmode="decimal" name="pmin" value="{{ pmin }}"></label>
+        <label>до<input type="text" inputmode="decimal" name="pmax" value="{{ pmax }}"></label>
+      </div>
+      <label>Сортировка
+        <select name="sort">
+          <option value="new" {{ 'selected' if sort == 'new' }}>Сначала новые</option>
+          <option value="price_asc" {{ 'selected' if sort == 'price_asc' }}>Сначала дешевле</option>
+          <option value="price_desc" {{ 'selected' if sort == 'price_desc' }}>Сначала дороже</option>
+          <option value="name" {{ 'selected' if sort == 'name' }}>По названию</option>
+        </select>
+      </label>
+      <button class="btn btn-block" type="submit">Применить</button>
+      <a class="btn btn-ghost btn-block" href="{{ url_for('catalog') }}">Сбросить</a>
+    </form>
+  </aside>
+
+  <section>
+    <div class="chips">
+      <a class="chip {{ 'active' if not f_game }}" href="{{ url_for('catalog') }}">Все игры</a>
+      {% for g_ in games %}
+      <a class="chip {{ 'active' if f_game == g_.game_id }}" href="{{ url_for('catalog', game=g_.game_id) }}">
+        {% if g_.logo %}<img src="{{ g_.logo }}" alt="">{% else %}<span class="chip-ph">{{ g_.game_name|initials }}</span>{% endif %}
+        {{ g_.game_name }}
+      </a>
+      {% endfor %}
+    </div>
+    <p class="muted">Найдено: {{ total }}</p>
+    {% if listings %}
+    <div class="grid">
+      {% for l in listings %}
+      <a class="skin card rarity-{{ l.rarity_name|rarity_cls }}" href="{{ url_for('listing_page', listing_id=l.listing_id) }}">
+        <div class="skin-img">
+          {% if l.image_url %}<img src="{{ l.image_url }}" alt="{{ l.item_name }}" loading="lazy">
+          {% else %}<span class="ph">{{ l.item_name|initials }}</span>{% endif %}
+        </div>
+        <div class="skin-body">
+          <div class="skin-game">{{ l.game_name }} · {{ l.category_name }}</div>
+          <div class="skin-name">{{ l.item_name }}</div>
+          <div class="skin-meta"><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span><span class="muted">{{ l.qty }} шт.</span></div>
+          <div class="skin-price">{{ l.price|money }}</div>
+          <div class="muted small">Продавец: {{ l.seller_login }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% if pages > 1 %}
+    <nav class="pager">
+      {% for p in range(1, pages + 1) %}
+        {% if p == page %}<span class="current">{{ p }}</span>
+        {% else %}<a href="{{ url_for('catalog', page=p, **args) }}">{{ p }}</a>{% endif %}
+      {% endfor %}
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="card empty">По вашему запросу ничего не найдено.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/forms.js') }}"></script>
+<script>bindCategoryFilter(document.getElementById('f-game'), document.getElementById('f-category'), {allLabel: true});</script>
+{% endblock %}

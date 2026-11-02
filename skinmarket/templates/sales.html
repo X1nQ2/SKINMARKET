@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Заказы покупателей{% endblock %}
+{% block content %}
+<h1>Заказы моих покупателей</h1>
+<p><a href="{{ url_for('sell') }}">&larr; Мои объявления</a></p>
+{% if orders %}
+<div class="card">
+  <table class="table">
+    <thead><tr><th>№</th><th>Товар</th><th>Покупатель</th><th>Кол-во</th><th>Сумма</th><th>Дата</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for o in orders %}
+      <tr>
+        <td>{{ o.order_id }}</td>
+        <td>{{ o.item_name }}</td>
+        <td>{{ o.buyer_login }}</td>
+        <td>{{ o.qty }}</td>
+        <td>{{ o.order_sum|money }}</td>
+        <td>{{ o.created_at|dt }}</td>
+        <td><span class="tag">{{ o.status_name }}</span></td>
+        <td class="actions">
+          {% if o.open %}
+          <form method="post" action="{{ url_for('order_complete', order_id=o.order_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm" type="submit">Товар передан</button>
+          </form>
+          <form method="post" action="{{ url_for('order_cancel', order_id=o.order_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Отменить</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty">Заказов пока нет.</div>
+{% endif %}
+{% endblock %}
