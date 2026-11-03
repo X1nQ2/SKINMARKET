@@ -8,7 +8,17 @@
     <p class="muted">{{ user.email }} · роль: {{ user.role_name }}</p>
     <div class="price-big">{{ user.balance|money }}</div>
     <p class="muted small">Демо-режим: пополнение и вывод не связаны с реальными платежами.</p>
-
+    <h3>Привязка Steam</h3>
+    {% if steam_linked %}
+      <p class="muted">Steam ID: {{ steam_linked }}</p>
+      <form method="post" action="{{ url_for('steam_unlink') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-ghost btn-sm" type="submit">Отвязать Steam</button>
+      </form>
+    {% else %}
+      <p class="muted">Steam ещё не привязан.</p>
+      <a class="btn btn-sm steam-login" href="{{ url_for('steam_link') }}">Привязать Steam</a>
+    {% endif %}
     <form method="post" action="{{ url_for('topup') }}" class="inline-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="text" inputmode="decimal" name="amount" placeholder="Сумма, ₽" required>
@@ -19,32 +29,23 @@
       <input type="text" inputmode="decimal" name="amount" placeholder="Сумма, ₽" required>
       <button class="btn btn-ghost btn-sm" type="submit">Вывести</button>
     </form>
-
     {% if user.role_name == 'Покупатель' %}
-    <hr>
-    <p>Хотите продавать скины?</p>
+    <hr><p>Хотите продавать скины?</p>
     <form method="post" action="{{ url_for('become_seller') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn" type="submit">Стать продавцом</button>
     </form>
     {% endif %}
   </div>
-
   <div class="card">
     <h2>История операций</h2>
     {% if transactions %}
     <table class="table">
       <thead><tr><th>Дата</th><th>Операция</th><th>Заказ</th><th class="num">Сумма</th></tr></thead>
-      <tbody>
-      {% for t in transactions %}
-        <tr>
-          <td>{{ t.created_at|dt }}</td>
-          <td>{{ t.trans_type }}</td>
-          <td>{{ t.order_id or '—' }}</td>
-          <td class="num {{ 'pos' if t.amount > 0 else 'neg' }}">{{ t.amount|money }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
+      <tbody>{% for t in transactions %}
+        <tr><td>{{ t.created_at|dt }}</td><td>{{ t.trans_type }}</td><td>{{ t.order_id or '—' }}</td>
+        <td class="num {{ 'pos' if t.amount > 0 else 'neg' }}">{{ t.amount|money }}</td></tr>
+      {% endfor %}</tbody>
     </table>
     {% else %}<p class="muted">Операций пока нет.</p>{% endif %}
   </div>

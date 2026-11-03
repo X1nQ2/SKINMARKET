@@ -1210,8 +1210,12 @@ def make_handler(code):
 for _code in ERRORS:
     app.register_error_handler(_code, make_handler(_code))
 
+from steam_auth import init_steam_auth
+
+init_steam_auth(app, get_db)
 
 if __name__ == "__main__":
+    
     _db = Db(app.config["DB_PATH"])
     try:
         if ensure_admin(_db, *DEFAULT_ADMIN):
