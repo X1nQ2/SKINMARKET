@@ -532,39 +532,10 @@ def listing_page(listing_id):
 # ------------------------------------------------------ регистрация и вход
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    """Создание новых аккаунтов доступно только через подтверждённый Steam OpenID."""
     if g.user:
         return redirect(url_for("catalog"))
-    if request.method == "POST":
-        db = get_db()
-        login_name = request.form.get("login", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        try:
-            if not re.fullmatch(r"[A-Za-z0-9_]{3,30}", login_name):
-                raise ShopError("Логин: 3–30 символов, латиница, цифры и «_».")
-            if len(email) > 100 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-                raise ShopError("Введите корректный email.")
-            if not 6 <= len(password) <= 128:
-                raise ShopError("Пароль: от 6 до 128 символов.")
-            if password != request.form.get("password2", ""):
-                raise ShopError("Пароли не совпадают.")
-            if db.one("SELECT КодПользователя AS user_id FROM Пользователи WHERE Логин = ? OR Email = ?",
-                      (login_name, email)):
-                raise ShopError("Такой логин или email уже занят.")
-        except ShopError as error:
-            flash(str(error), "error")
-            return render_template("register.html", login=login_name, email=email), 400
-        user_id = db.insert(
-            "INSERT INTO Пользователи (Логин, Email, ХешПароля, КодРоли, Баланс, ДатаРегистрации, Заблокирован) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (login_name, email, hash_password(password), lookup("role", ROLE_BUYER),
-             Decimal("0.00"), db.now(), False))
-        session.clear()
-        session["uid"] = user_id
-        flash("Добро пожаловать в SKINMARKET!", "success")
-        return redirect(url_for("catalog"))
-    return render_template("register.html", login="", email="")
-
+    return redirect(url_for("steam_login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():

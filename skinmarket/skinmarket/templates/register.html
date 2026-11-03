@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Регистрация через Steam{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>Регистрация в SKINMARKET</h1>
+  <p class="muted">Новый аккаунт можно создать только через Steam.</p>
+  <a class="btn btn-block steam-login" href="{{ url_for('steam_login') }}">Зарегистрироваться через Steam</a>
+  <p class="muted">SKINMARKET не получает и не запрашивает пароль Steam.</p>
+  <p class="muted">Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a></p>
+</div>
+{% endblock %}
