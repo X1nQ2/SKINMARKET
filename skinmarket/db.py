@@ -31,8 +31,15 @@ def join_sql(base, *joins):
 
 class Db:
     def __init__(self, path):
-        self.path = os.path.abspath(path)
+        if not path or not str(path).strip():
+            raise ValueError("Не задан путь к базе данных. Проверьте DB_PATH в .env.")
+        self.path = os.path.abspath(os.path.expanduser(str(path).strip()))
         self.sqlite = self.path.lower().endswith((".sqlite", ".sqlite3"))
+        if not os.path.isfile(self.path) and not self.sqlite:
+            raise FileNotFoundError(
+                "Файл Microsoft Access не найден: " + self.path +
+                ". Положите database.accdb рядом с server.py или укажите полный путь в DB_PATH."
+            )
         if self.sqlite:
             self.conn = sqlite3.connect(self.path)
             self.conn.execute("PRAGMA foreign_keys = ON")

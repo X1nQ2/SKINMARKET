@@ -1,5 +1,6 @@
 """Steam OpenID 2.0 login, new-account creation and account linking."""
 import re
+import time
 import secrets
 from urllib.parse import urlencode
 
@@ -8,6 +9,26 @@ from flask import abort, flash, g, redirect, request, session, url_for
 from werkzeug.security import generate_password_hash
 
 STEAM_ENDPOINT = "https://steamcommunity.com/openid/login"
+PROFILE_NAME_CACHE = {}
+
+def steam_persona_name(steam_id):
+    cached = PROFILE_NAME_CACHE.get(steam_id)
+    if cached and time.time() - cached[0] < 3600:
+        return cached[1]
+    try:
+        response = requests.get(f"https://steamcommunity.com/profiles/{steam_id}?l=english",
+                                headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+        response.raise_for_status()
+        match = re.search(r'<meta\s+property="og:title"\s+content="([^"<>]+)"', response.text, re.I)
+        name = match.group(1).strip() if match else ""
+        name = re.sub(r"\s*::\s*Steam Community.*$", "", name).strip()
+        if name:
+            PROFILE_NAME_CACHE[steam_id] = (time.time(), name)
+            return name
+    except requests.RequestException:
+        pass
+    return None
+
 STEAM_ID_RE = re.compile(
     r"^https?://steamcommunity\.com/openid/id/([0-9]{17})/?$"
 )
@@ -221,6 +242,17 @@ def init_steam_auth(app, get_db):
         return redirect(url_for("profile"))
 
     @app.context_processor
+    def inject_steam_display_name():
+        user = g.get("user")
+        if not user:
+            return {"steam_display_name": None}
+        try:
+            row = get_db().one("SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?", (user["user_id"],))
+            return {"steam_display_name": steam_persona_name(row["SteamID"]) if row else None}
+        except Exception:
+            return {"steam_display_name": None}
+
+    @app.context_processor
     def inject_steam_link_status():
         user = g.get("user")
         if not user:
@@ -236,23 +268,9 @@ def init_steam_auth(app, get_db):
 
     @app.post("/auth/steam/unlink")
     def steam_unlink():
+        # Steam is the identity provider for new SKINMARKET accounts.
+        # Unlinking would lock a Steam-only user out of their account.
         if not g.user:
             return redirect(url_for("login"))
-        db = get_db()
-        row = db.one(
-            "SELECT ХешПароля AS pw FROM Пользователи WHERE КодПользователя = ?",
-            (g.user["user_id"],),
-        )
-        # Keep users from locking themselves out of accounts created via Steam only.
-        if row and row["pw"] and str(row["pw"]).startswith(("scrypt:", "pbkdf2:")):
-            db.execute(
-                "DELETE FROM SteamAccounts WHERE КодПользователя = ?",
-                (g.user["user_id"],),
-            )
-            flash("Steam отвязан. Теперь можно входить по логину и паролю.", "success")
-        else:
-            flash(
-                "Сначала задайте отдельный пароль SKINMARKET, затем отвяжите Steam.",
-                "error",
-            )
+        flash("Отвязка Steam отключена: вход в этот аккаунт выполняется через Steam.", "error")
         return redirect(url_for("profile"))

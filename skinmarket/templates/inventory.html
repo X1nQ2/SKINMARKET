@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Инвентарь Steam{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1>Мой инвентарь Steam</h1>
+  <p class="muted">Выберите игру, затем предмет из инвентаря. Для публикации укажите только цену.</p>
+</section>
+{% if inventory_error %}
+  <div class="card"><p>{{ inventory_error }}</p>
+  {% if steam_id %}<p><a target="_blank" rel="noopener" href="https://steamcommunity.com/profiles/{{ steam_id }}/edit/settings">Настройки приватности Steam</a></p>{% endif %}</div>
+{% elif games %}
+  <form method="get" class="card stack-form" style="max-width:520px">
+    <label>Игра Steam
+      <select name="appid" onchange="this.form.submit()">
+        {% for game in games %}<option value="{{ game.appid }}" {{ 'selected' if selected_appid == game.appid|string }}>{{ game.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button class="btn" type="submit">Показать инвентарь</button></noscript>
+  </form>
+  {% if selected_game %}<p class="muted">Игра: {{ selected_game.name }} · найдено предметов: {{ items|length }}</p>{% endif %}
+  {% if not items %}<div class="card"><p>В этой игре нет доступных предметов инвентаря или инвентарь скрыт настройками Steam.</p></div>{% endif %}
+  <div class="catalog-grid">
+  {% for item in items %}
+    <article class="card listing-card">
+      {% if item.image %}<img class="listing-image" src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">{% else %}<div class="listing-image"></div>{% endif %}
+      <div class="listing-body">
+        <h3>{{ item.name }}</h3><p class="muted small">{{ item.type }}</p>
+        {% if item.assetid in imported %}<span class="badge">Уже выставлен</span>
+        {% elif not item.tradable %}<span class="badge">Нельзя передать</span>
+        {% else %}
+          <form method="post" action="{{ url_for('list_steam_item') }}" class="stack-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="appid" value="{{ selected_appid }}">
+            <input type="hidden" name="game_name" value="{{ selected_game.name }}">
+            <input type="hidden" name="assetid" value="{{ item.assetid }}">
+            <label>Цена, ₽<input type="number" name="price" min="0.01" max="10000000" step="0.01" placeholder="Например, 150" required></label>
+            <button class="btn btn-block" type="submit">Добавить в каталог</button>
+          </form>
+        {% endif %}
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+{% else %}<div class="card"><p>Список игр Steam не получен.</p></div>{% endif %}
+<p class="hint">Steam показывает только игры и предметы, доступные через публичный инвентарь. Передача покупателю пока выполняется вручную через Steam Trade Offer.</p>
+{% endblock %}

@@ -20,8 +20,16 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 app = Flask(__name__)
+# Пустой DB_PATH в .env/переменных Windows не должен превращаться в путь
+# к текущей папке VS Code. Относительные пути считаем от папки проекта.
+_db_path_setting = (os.getenv("DB_PATH") or "").strip()
+if not _db_path_setting:
+    _db_path_setting = str(BASE_DIR / "database.accdb")
+_db_path = Path(_db_path_setting).expanduser()
+if not _db_path.is_absolute():
+    _db_path = BASE_DIR / _db_path
 app.config.update(
-    DB_PATH=os.getenv("DB_PATH", str(BASE_DIR / "database.accdb")),
+    DB_PATH=str(_db_path.resolve()),
     CARTS_PATH=os.getenv("CARTS_PATH", str(BASE_DIR / "carts.json")),
     MAX_TOPUP=Decimal(os.getenv("MAX_TOPUP", "100000")),
     PLAIN_PASSWORDS=os.getenv("PLAIN_PASSWORDS", "1") == "1",
@@ -30,10 +38,14 @@ app.config.update(
     PER_PAGE=12,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "0") == "1",
 )
 
 
 def load_secret_key():
+    configured = os.getenv("SECRET_KEY")
+    if configured:
+        return configured
     path = BASE_DIR / "secret.key"
     try:
         return path.read_text(encoding="utf-8").strip()
@@ -842,6 +854,12 @@ def item_names(db):
 @app.route("/sell/new", methods=["GET", "POST"])
 @roles_required(ROLE_SELLER, ROLE_ADMIN)
 def sell_new():
+    # New listings are created by selecting an actual item from Steam inventory.
+    linked = get_db().one("SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?", (g.user["user_id"],))
+    if linked:
+        return redirect(url_for("steam_inventory_page"))
+    flash("Сначала привяжите аккаунт Steam, чтобы выбрать предмет из инвентаря.", "error")
+    return redirect(url_for("profile"))
     db = get_db()
     ref = reference_data(db)
     ref["item_names"] = item_names(db)
@@ -1182,8 +1200,10 @@ for _code in ERRORS:
     app.register_error_handler(_code, make_handler(_code))
 
 from steam_auth import init_steam_auth
+from steam_inventory import init_steam_inventory
 
 init_steam_auth(app, get_db)
+init_steam_inventory(app, get_db)
 
 if __name__ == "__main__":
     
