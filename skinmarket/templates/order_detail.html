@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Заказ №{{ o.order_id }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span>
+  {% if is_buyer %}
+    <a href="{{ url_for('orders') }}">Мои заказы</a>
+  {% else %}
+    <a href="{{ url_for('sales') }}">Заказы покупателей</a>
+  {% endif %}
+  <span class="sep">/</span><span>Заказ №{{ o.order_id }}</span>
+</nav>
+
+<div class="head-row">
+  <h1>Заказ №{{ o.order_id }}</h1>
+  <div class="head-actions">
+    <span class="tag tag-{{ status_css }}">{{ o.status_name }}</span>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('orders') if is_buyer else url_for('sales') }}">К списку</a>
+  </div>
+</div>
+
+<div class="order-layout">
+  <section class="card order-main">
+    <div class="order-head">
+      <div class="order-thumb">
+        {% if o.image_url %}<img src="{{ o.image_url }}" alt="{{ o.item_name }}">
+        {% else %}<span class="ph">{{ o.item_name|initials }}</span>{% endif %}
+      </div>
+      <div class="order-title">
+        <div class="skin-game">{{ o.game_name }} · {{ o.category_name }}</div>
+        <h2><a href="{{ url_for('listing_page', listing_id=o.listing_id) }}">{{ o.item_name }}</a></h2>
+        <p class="muted small">Оформлен {{ o.created_at|dt }}</p>
+      </div>
+    </div>
+    <dl class="item-facts">
+      <div><dt>Количество</dt><dd>{{ o.qty }} шт.</dd></div>
+      <div><dt>Сумма</dt><dd>{{ o.order_sum|money }}</dd></div>
+      <div><dt>Покупатель</dt><dd>{{ o.buyer_name or o.buyer_login }}</dd></div>
+      <div><dt>Продавец</dt><dd>{{ o.seller_name or o.seller_login }}</dd></div>
+    </dl>
+  </section>
+
+  <aside class="card order-side">
+    <h2>Передача предмета</h2>
+    {% if trade_url %}
+      <p class="muted small">
+        {% if is_buyer %}Продавец указал ссылку обмена Steam. Откройте её и отправьте предложение обмена.
+        {% else %}Это ваша ссылка обмена — покупатель видит её на этой странице.{% endif %}
+      </p>
+      <a class="btn btn-block" href="{{ trade_url }}" target="_blank" rel="noopener">
+        {{ 'Открыть обмен в Steam' if is_buyer else 'Проверить свою ссылку обмена' }}
+      </a>
+      {% if not is_buyer %}
+        <p class="hint"><a href="{{ url_for('profile') }}">Изменить Steam Trade URL</a></p>
+      {% endif %}
+    {% else %}
+      {% if is_buyer %}
+        <p class="muted small">Продавец пока не указал Steam Trade URL. Напишите ему в чате, чтобы согласовать обмен.</p>
+      {% else %}
+        <p class="muted small">Чтобы покупатель мог отправить предложение обмена, укажите Steam Trade URL в профиле.</p>
+        <a class="btn btn-sm" href="{{ url_for('profile') }}">Указать Steam Trade URL</a>
+      {% endif %}
+    {% endif %}
+    <hr>
+    <div class="seller-panel-head">
+      {% if counterpart_avatar %}
+        <img class="seller-panel-avatar" src="{{ counterpart_avatar }}" alt="" referrerpolicy="no-referrer">
+      {% else %}
+        <span class="seller-panel-avatar seller-avatar-ph">{{ (counterpart_name or counterpart_login)|initials }}</span>
+      {% endif %}
+      <div>
+        <div class="muted small">{{ 'Продавец' if is_buyer else 'Покупатель' }}</div>
+        <div class="seller-panel-name">
+          {% if seller_page_url %}
+            <a href="{{ seller_page_url }}">{{ counterpart_name or counterpart_login }}</a>
+          {% else %}
+            {{ counterpart_name or counterpart_login }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <p class="muted small">Передавайте предмет только через Steam Trade Offer и только после оплаты заказа на сайте.</p>
+    <hr>
+    <h3>Статус сделки</h3>
+    <p class="muted small">
+      {% if o.status_css == 'paid' %}Оплачен. Деньги удерживаются платформой, продавец готовит передачу предмета.
+      {% elif o.status_css == 'sent' %}Предмет отправлен. Покупатель проверяет его и подтверждает получение.
+      {% elif o.status_css == 'dispute' %}Открыт спор. Деньги заморожены, решение принимает администратор.
+      {% elif o.status_css == 'done' %}Заказ выполнен. Деньги переведены продавцу.
+      {% elif o.status_css == 'cancelled' %}Заказ закрыт с возвратом денег покупателю.
+      {% else %}Заказ создан.{% endif %}
+    </p>
+    {% if auto_confirm_at %}
+      <p class="hint">Если покупатель не подтвердит получение до {{ auto_confirm_at|dt }}, заказ закроется автоматически.</p>
+    {% endif %}
+    {% if can_send %}
+      <form method="post" action="{{ url_for('order_send', order_id=o.order_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-block" type="submit">Товар отправлен</button>
+      </form>
+      <p class="hint">Нажмите после отправки обмена в Steam — деньги пока останутся на платформе.</p>
+    {% endif %}
+    {% if can_confirm %}
+      <form method="post" action="{{ url_for('order_confirm', order_id=o.order_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-block" type="submit">Подтвердить получение</button>
+      </form>
+      <p class="hint">Подтверждайте только после проверки предмета в Steam.</p>
+      <div class="dispute-box" id="dispute">
+        <h3>Проблема с заказом?</h3>
+        <form method="post" action="{{ url_for('order_dispute', order_id=o.order_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <textarea name="reason" rows="2" maxlength="500" required
+                    placeholder="Опишите проблему: предмет не пришёл, не тот скин и т. п."></textarea>
+          <button class="btn btn-ghost btn-block" type="submit">Открыть спор</button>
+        </form>
+      </div>
+    {% endif %}
+    {% if o.status_css == 'dispute' %}
+      <p class="muted small">Причина спора: «{{ o.dispute_reason }}».</p>
+    {% endif %}
+  </aside>
+</div>
+
+<section class="card chat" id="chat">
+  <h2>Чат с {{ counterpart_name or counterpart_login }}</h2>
+  <div class="chat-log">
+    {% for m in messages %}
+      {% if m.sender_id == user.user_id %}
+        <div class="chat-msg own">
+          <div class="chat-bubble">{{ m.msg_text }}</div>
+          <span class="chat-time">{{ m.created_at|dt }}</span>
+        </div>
+      {% else %}
+        <div class="chat-msg">
+          {% if counterpart_avatar %}
+            <img class="user-avatar" src="{{ counterpart_avatar }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+          {% else %}
+            <span class="user-avatar user-avatar-ph">{{ (counterpart_name or counterpart_login)|initials }}</span>
+          {% endif %}
+          <div class="chat-content">
+            <div class="chat-author">{{ counterpart_name or counterpart_login }}</div>
+            <div class="chat-bubble">{{ m.msg_text }}</div>
+            <span class="chat-time">{{ m.created_at|dt }}</span>
+          </div>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">Сообщений пока нет. Договоритесь об обмене: напишите первым.</p>
+    {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('order_send_message', order_id=o.order_id) }}" class="chat-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <textarea name="text" rows="3" maxlength="{{ max_message_len }}" required
+              placeholder="Например: готов отправить обмен, отправьте ссылку на свой профиль"></textarea>
+    <div class="chat-form-row">
+      <span class="muted small">До {{ max_message_len }} символов. Не отправляйте пароли и коды Steam Guard.</span>
+      <button class="btn" type="submit">Отправить</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -66,6 +66,22 @@ class Db:
         cursor.close()
         return rows
 
+    def columns(self, table):
+        """Названия колонок таблицы без чтения данных (Access и SQLite)."""
+        cursor = self._run(f"SELECT * FROM {table} WHERE 1 = 0", ())
+        try:
+            return [str(column[0]) for column in cursor.description]
+        finally:
+            cursor.close()
+
+    def has_table(self, table):
+        try:
+            self.columns(table)
+            return True
+        except Exception:
+            self.rollback()
+            return False
+
     def one(self, sql, params=()):
         rows = self.query(sql, params)
         return rows[0] if rows else None

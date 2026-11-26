@@ -1,10 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Заказы покупателей{% endblock %}
 {% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span>
+  <a href="{{ url_for('sell') }}">Мои объявления</a><span class="sep">/</span><span>Заказы покупателей</span>
+</nav>
 <h1>Заказы моих покупателей</h1>
 <p><a href="{{ url_for('sell') }}">&larr; Мои объявления</a></p>
 {% if orders %}
 <div class="card">
+  <div class="table-wrap">
   <table class="table">
     <thead><tr><th>№</th><th>Товар</th><th>Покупатель</th><th>Кол-во</th><th>Сумма</th><th>Дата</th><th>Статус</th><th></th></tr></thead>
     <tbody>
@@ -12,27 +17,40 @@
       <tr>
         <td>{{ o.order_id }}</td>
         <td>{{ o.item_name }}</td>
-        <td>{{ o.buyer_login }}</td>
+        <td>
+          <div class="user-cell">
+            {% if o.buyer_avatar %}
+              <img class="user-avatar" src="{{ o.buyer_avatar }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+            {% else %}
+              <span class="user-avatar user-avatar-ph">{{ (o.buyer_name or o.buyer_login)|initials }}</span>
+            {% endif %}
+            <span>{{ o.buyer_name or o.buyer_login }}</span>
+          </div>
+        </td>
         <td>{{ o.qty }}</td>
         <td>{{ o.order_sum|money }}</td>
         <td>{{ o.created_at|dt }}</td>
-        <td><span class="tag">{{ o.status_name }}</span></td>
+        <td><span class="tag tag-{{ o.status_css }}">{{ o.status_name }}</span></td>
         <td class="actions">
-          {% if o.open %}
-          <form method="post" action="{{ url_for('order_complete', order_id=o.order_id) }}">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('order_detail', order_id=o.order_id) }}">Чат и обмен</a>
+          {% if o.can_send %}
+          <form method="post" action="{{ url_for('order_send', order_id=o.order_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm" type="submit">Товар передан</button>
+            <button class="btn btn-sm" type="submit">Товар отправлен</button>
           </form>
           <form method="post" action="{{ url_for('order_cancel', order_id=o.order_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-ghost btn-sm" type="submit">Отменить</button>
           </form>
+          {% elif o.awaiting %}
+            <span class="muted small">Ждём подтверждения{% if o.auto_confirm_at %} до {{ o.auto_confirm_at|dt }}{% endif %}</span>
           {% endif %}
         </td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% else %}
 <div class="card empty">Заказов пока нет.</div>

@@ -2,7 +2,17 @@
 {% block title %}Каталог{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('admin') }}">&larr; Админ-панель</a></p>
-<div class="head-row"><h1>Каталог: игры, категории, скины</h1></div>
+<div class="head-row"><h1>Каталог: игры, категории, редкости</h1></div>
+
+<div class="card">
+  <p><b>Предметы добавляются только из инвентаря Steam.</b></p>
+  <p class="muted">
+    Продавец открывает «Инвентарь Steam», выбирает реальный предмет из CS2, Dota 2 или Rust
+    и указывает цену. Вручную создать товар или выставить его без предмета в инвентаре нельзя.
+    Здесь можно управлять логотипами игр, категориями, редкостями и картинками уже добавленных предметов.
+  </p>
+  <p><a class="btn btn-sm" href="{{ url_for('steam_inventory_page') }}">Перейти в инвентарь Steam</a></p>
+</div>
 
 <h2>Игры</h2>
 <div class="game-grid">
@@ -40,10 +50,11 @@
 
   <div class="card game-card add-card">
     <h3>Новая игра</h3>
+    <p class="muted small">Доступны только CS2, Dota 2 и Rust.</p>
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="kind" value="game">
-      <label>Название<input type="text" name="name" maxlength="60" required></label>
+      <label>Название<input type="text" name="name" maxlength="60" required placeholder="CS2, Dota 2 или Rust"></label>
       <label>Логотип (PNG, JPG, GIF, WEBP до 5 МБ)
         <input type="file" name="logo" id="game-logo" accept="image/png,image/jpeg,image/gif,image/webp">
       </label>
@@ -66,58 +77,8 @@
   </form>
 </div>
 
-<h2>Добавить скин в каталог</h2>
-<div class="card">
-  {% if games %}
-  <form method="post" enctype="multipart/form-data">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="kind" value="item">
-    <div class="row">
-      <label>Игра
-        <select name="game" id="item-game" required>
-          <option value="">Выберите…</option>
-          {% for g_ in games %}<option value="{{ g_.game_id }}">{{ g_.game_name }}</option>{% endfor %}
-        </select>
-      </label>
-      <label>Категория
-        <select name="category" id="item-category" required>
-          <option value="">Сначала выберите игру</option>
-          {% for c in categories %}<option value="{{ c.category_id }}" data-game="{{ c.game_id }}">{{ c.category_name }}</option>{% endfor %}
-        </select>
-      </label>
-      <label>Редкость
-        <select name="rarity" required>
-          {% for r in rarities %}<option value="{{ r.rarity_id }}">{{ r.rarity_name }}</option>{% endfor %}
-        </select>
-      </label>
-    </div>
-    <label>Название скина<input type="text" name="name" maxlength="120" required></label>
-    <label>Описание<textarea name="description" rows="2" maxlength="1000"></textarea></label>
-    <div class="row">
-      <label>Картинка: файл
-        <input type="file" name="image_file" id="item-file" accept="image/png,image/jpeg,image/gif,image/webp">
-      </label>
-      <label>или ссылка
-        <input type="url" name="image_url" maxlength="240" placeholder="https://…">
-      </label>
-    </div>
-    <img id="item-preview" class="preview" alt="Предпросмотр" hidden>
-    <div class="row">
-      <label>Цена, ₽
-        <input type="text" inputmode="decimal" name="price" placeholder="например, 1500">
-        <span class="hint">С ценой скин сразу появится в каталоге. Без цены он только попадёт в список ниже.</span>
-      </label>
-      <label>Количество<input type="number" name="qty" min="1" max="9999" value="1"></label>
-    </div>
-    <button class="btn" type="submit">Добавить скин</button>
-  </form>
-  {% else %}
-  <p class="muted">Сначала добавьте игру.</p>
-  {% endif %}
-</div>
-
 <div class="head-row">
-  <h2>Скины в каталоге <span class="muted small">({{ items_total }})</span></h2>
+  <h2>Предметы в каталоге <span class="muted small">({{ items_total }})</span></h2>
   <form method="get" class="inline-form">
     <select name="game" aria-label="Фильтр по игре" onchange="this.form.submit()">
       <option value="">Все игры</option>
@@ -128,7 +89,7 @@
 <div class="card">
   {% if items %}
   <table class="table">
-    <thead><tr><th>Картинка</th><th>Скин</th><th>Игра · категория</th><th>Редкость</th><th>Продажа</th><th>Заменить картинку</th></tr></thead>
+    <thead><tr><th>Картинка</th><th>Предмет</th><th>Игра · категория</th><th>Редкость</th><th>Продажа</th><th>Заменить картинку</th></tr></thead>
     <tbody>
     {% for i in items %}
       <tr>
@@ -139,15 +100,7 @@
         <td class="sale-cell">
           {% if i.sale %}<div class="small"><span class="tag tag-ok">в продаже</span> {{ i.sale.qty }} шт. от {{ i.sale.min|money }}</div>
           {% else %}<div class="small"><span class="tag tag-bad">нет на витрине</span></div>{% endif %}
-          <form method="post" class="inline-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="kind" value="item_listing">
-            <input type="hidden" name="item_id" value="{{ i.item_id }}">
-            <input type="hidden" name="filter_game" value="{{ f_game or '' }}">
-            <input type="text" inputmode="decimal" name="price" placeholder="Цена, ₽" size="8" required aria-label="Цена">
-            <input type="number" name="qty" value="1" min="1" max="9999" aria-label="Количество" style="max-width:76px">
-            <button class="btn btn-sm" type="submit">Выставить</button>
-          </form>
+          <div class="muted small">Добавляется и снимается продавцом через инвентарь Steam.</div>
         </td>
         <td>
           <form method="post" enctype="multipart/form-data" class="inline-form">
@@ -166,7 +119,7 @@
   </table>
   {% if items_total > items|length %}<p class="muted small">Показаны последние {{ items|length }}. Выберите игру в фильтре, чтобы сузить список.</p>{% endif %}
   {% else %}
-  <p class="muted">Скинов пока нет.</p>
+  <p class="muted">Предметов пока нет. Они появятся после добавления из инвентаря Steam.</p>
   {% endif %}
 </div>
 {% endblock %}
@@ -174,10 +127,5 @@
 <script src="{{ url_for('static', filename='js/forms.js') }}"></script>
 <script>
   bindPreview(document.getElementById('game-logo'), document.getElementById('game-logo-preview'));
-  var itemGame = document.getElementById('item-game');
-  if (itemGame) {
-    bindCategoryFilter(itemGame, document.getElementById('item-category'));
-    bindPreview(document.getElementById('item-file'), document.getElementById('item-preview'));
-  }
 </script>
 {% endblock %}

@@ -17,9 +17,6 @@ GAMES = {
     "CS2": (730, "counter-strike"),
     "Dota 2": (570, "dota"),
     "Rust": (252490, "rust"),
-    "Team Fortress 2": (440, "team fortress"),
-    "PUBG: Battlegrounds": (578080, "pubg"),
-    "Apex Legends": (1172470, "apex"),
 }
 API = "https://store.steampowered.com/api/appdetails?appids={id}&filters=basic"
 CDN = "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{id}/header.jpg"

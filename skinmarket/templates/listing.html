@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ l.item_name }}{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('catalog') }}">&larr; Назад в каталог</a></p>
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span>
+  <a href="{{ url_for('catalog', game=l.game_id) }}">{{ l.game_name }}</a><span class="sep">/</span>
+  <span>{{ l.item_name }}</span>
+</nav>
 <div class="detail">
   <div class="card detail-img rarity-{{ l.rarity_name|rarity_cls }}">
     {% if l.image_url %}<img src="{{ l.image_url }}" alt="{{ l.item_name }}">
@@ -12,7 +16,6 @@
     <h1>{{ l.item_name }}</h1>
     <p><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span>
        <span class="tag">{{ l.status_name }}</span></p>
-    {% if l.item_desc %}<p>{{ l.item_desc }}</p>{% endif %}
     <div class="price-big">{{ l.price|money }}</div>
     <p class="muted">В наличии: {{ l.qty }} шт.</p>
 
@@ -33,16 +36,78 @@
       </form>
       <p class="muted small">Деньги удерживаются на платформе до тех пор, пока продавец не выполнит заказ.</p>
     {% endif %}
+
+    <div class="seller-inline">
+      {% if l.seller_avatar %}
+        <img class="seller-inline-avatar" src="{{ l.seller_avatar }}" alt="" referrerpolicy="no-referrer">
+      {% else %}
+        <span class="seller-inline-avatar seller-avatar-ph">{{ (l.seller_name or l.seller_login)|initials }}</span>
+      {% endif %}
+      <div class="seller-inline-info">
+        <div class="muted small">Продавец</div>
+        <div class="seller-inline-name">
+          <a href="{{ url_for('seller_page', seller_id=l.seller_id) }}">{{ l.seller_name or l.seller_login }}</a>
+        </div>
+        {% if rating is not none %}
+          <div class="muted small">★ {{ rating }} из 5 · {{ reviews_count }} отзывов</div>
+        {% else %}
+          <div class="muted small">Отзывов пока нет</div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 
+<div class="product-columns">
+  <section class="card product-about">
+    <h2>О товаре</h2>
+    {% if product_description %}
+      <div class="steam-description">{{ product_description }}</div>
+    {% else %}
+      <p class="muted">Описание из Steam пока недоступно. Оно загрузится автоматически, когда инвентарь Steam будет открыт.</p>
+    {% endif %}
+    <dl class="item-facts">
+      <div><dt>Игра</dt><dd>{{ l.game_name }}</dd></div>
+      <div><dt>Категория</dt><dd>{{ l.category_name }}</dd></div>
+      <div><dt>Редкость</dt><dd>{{ l.rarity_name }}</dd></div>
+      <div><dt>Наличие</dt><dd>{{ l.qty }} шт.</dd></div>
+    </dl>
+    <p class="hint">Описание и изображение предмета принадлежат Steam и правообладателям игры. Проект учебный.</p>
+  </section>
+
+  <aside class="card seller-panel">
+    <h2>Продавец</h2>
+    <div class="seller-panel-head">
+      {% if l.seller_avatar %}
+        <img class="seller-panel-avatar" src="{{ l.seller_avatar }}" alt="" referrerpolicy="no-referrer">
+      {% else %}
+        <span class="seller-panel-avatar seller-avatar-ph">{{ (l.seller_name or l.seller_login)|initials }}</span>
+      {% endif %}
+      <div>
+        <div class="seller-panel-name">
+          <a href="{{ url_for('seller_page', seller_id=l.seller_id) }}">{{ l.seller_name or l.seller_login }}</a>
+        </div>
+        {% if l.seller_profile_url %}
+          <a class="small" href="{{ l.seller_profile_url }}" target="_blank" rel="noopener">Профиль Steam</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if rating is not none %}
+      <div class="seller-rating">★ {{ rating }} <span class="muted">/ 5 · {{ reviews_count }} отзывов</span></div>
+    {% else %}
+      <p class="muted small">У продавца пока нет отзывов.</p>
+    {% endif %}
+    <p><a class="btn btn-ghost btn-sm" href="{{ url_for('seller_page', seller_id=l.seller_id) }}">Все объявления продавца</a></p>
+    <p class="muted small">Оплата на демо-балансе. Передача предмета выполняется через Steam Trade Offer.</p>
+  </aside>
+</div>
+
 <div class="card">
-  <h2>Продавец: {{ l.seller_login }}</h2>
+  <h2>Отзывы о продавце {{ l.seller_name or l.seller_login }}</h2>
   {% if rating is not none %}
-    <p>Рейтинг: <b>{{ rating }}</b> из 5 ({{ reviews_count }} отзывов)</p>
     {% for r in reviews %}
       <div class="review">
-        <b>{{ r.buyer_login }}</b> · {{ '★' * r.rating }}{{ '☆' * (5 - r.rating) }} · <span class="muted">{{ r.created_at|dt }}</span>
+        <b>Покупатель</b> · {{ '★' * r.rating }}{{ '☆' * (5 - r.rating) }} · <span class="muted">{{ r.created_at|dt }}</span>
         {% if r.review_text %}<div>{{ r.review_text }}</div>{% endif %}
       </div>
     {% endfor %}

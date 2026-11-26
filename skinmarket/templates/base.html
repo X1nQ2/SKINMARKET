@@ -15,6 +15,7 @@
       {% if user %}
         <a href="{{ url_for('cart') }}">Корзина{% if cart_count %} <b class="badge">{{ cart_count }}</b>{% endif %}</a>
         <a href="{{ url_for('orders') }}">Мои заказы</a>
+        <a href="{{ url_for('messages') }}">Сообщения{% if unread_messages %} <b class="badge msg-badge">{{ unread_messages }}</b>{% endif %}</a>
         <a href="/profile/inventory">Инвентарь Steam</a>
         {% if user.role_name in (ROLE_SELLER, ROLE_ADMIN) %}
           <a href="{{ url_for('sell') }}">Продажи</a>
@@ -26,7 +27,14 @@
     </nav>
     <div class="account">
       {% if user %}
-        <a class="balance" href="{{ url_for('profile') }}" title="Профиль и баланс">{{ steam_display_name or user.login }} · {{ user.balance|money }}</a>
+        <a class="account-user" href="{{ url_for('profile') }}" title="Профиль Steam">
+          {% if steam_avatar %}
+            <img class="account-avatar" src="{{ steam_avatar }}" alt="Аватар {{ steam_display_name or user.login }}" referrerpolicy="no-referrer">
+          {% else %}
+            <span class="account-avatar account-avatar-ph">{{ (steam_display_name or user.login)[:1]|upper }}</span>
+          {% endif %}
+          <span class="account-name">{{ steam_display_name or user.login }}</span>
+        </a>
         <form method="post" action="{{ url_for('logout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-ghost btn-sm" type="submit">Выйти</button>
@@ -66,6 +74,7 @@
     </div>
     <div class="footer-col">
       <h4>Покупателям</h4>
+      <a href="{{ url_for('faq') }}">Как купить и продать</a>
       <a href="{{ url_for('delivery') }}">Оплата и сделка</a>
       <a href="{{ url_for('contacts') }}">Контакты и поддержка</a>
       <a href="{{ url_for('terms') }}">Пользовательское соглашение</a>

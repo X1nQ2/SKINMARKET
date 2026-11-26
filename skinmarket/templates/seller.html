@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{{ seller.seller_name }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span>
+  <span>{{ seller.seller_name }}</span>
+</nav>
+
+<section class="card seller-hero">
+  <div class="seller-hero-main">
+    {% if seller.seller_avatar %}
+      <img class="seller-hero-avatar" src="{{ seller.seller_avatar }}" alt="" referrerpolicy="no-referrer">
+    {% else %}
+      <span class="seller-hero-avatar seller-avatar-ph">{{ seller.seller_name|initials }}</span>
+    {% endif %}
+    <div class="seller-hero-info">
+      <h1>{{ seller.seller_name }}</h1>
+      <div class="seller-hero-meta">
+        <span class="tag">{{ seller.role_name }}</span>
+        <span class="muted small">На сайте с {{ seller.created_at|date }}</span>
+      </div>
+      <div class="seller-hero-rating">
+        {% if rating is not none %}
+          <b>★ {{ rating }}</b> <span class="muted">/ 5 · {{ reviews_count }} отзывов</span>
+        {% else %}
+          <span class="muted">Отзывов пока нет</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="seller-hero-actions">
+    <a class="btn" href="{{ contact_url }}"
+       {% if contact_external %}target="_blank" rel="noopener"{% endif %}>Написать продавцу</a>
+    {% if seller.seller_profile_url %}
+      <a class="btn btn-ghost" href="{{ seller.seller_profile_url }}" target="_blank" rel="noopener">Профиль Steam</a>
+    {% endif %}
+    {% if user and user.user_id == seller.user_id %}
+      <a class="btn btn-ghost" href="{{ url_for('sell') }}">Мои объявления</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if not contact_external %}
+  <p class="hint">У продавца не привязан Steam, поэтому кнопка ведёт в поддержку SKINMARKET.</p>
+{% endif %}
+
+<div class="stats">
+  <div class="card stat"><div class="muted">Выполненных сделок</div><b>{{ deals }}</b></div>
+  <div class="card stat"><div class="muted">Активных объявлений</div><b>{{ listings|length }}</b></div>
+  <div class="card stat"><div class="muted">Отзывов</div><b>{{ reviews_count }}</b></div>
+  <div class="card stat">
+    <div class="muted">Средняя оценка</div>
+    <b>{% if rating is not none %}★ {{ rating }}{% else %}—{% endif %}</b>
+  </div>
+</div>
+
+<section class="card">
+  <div class="head-row">
+    <h2>Объявления продавца</h2>
+    {% if listings %}<span class="muted small">В продаже: {{ listings|length }}</span>{% endif %}
+  </div>
+  {% if listings %}
+    <div class="grid">
+      {% for l in listings %}
+      <a class="skin card rarity-{{ l.rarity_name|rarity_cls }}" href="{{ url_for('listing_page', listing_id=l.listing_id) }}">
+        <div class="skin-img">
+          {% if l.image_url %}<img src="{{ l.image_url }}" alt="{{ l.item_name }}" loading="lazy">
+          {% else %}<span class="ph">{{ l.item_name|initials }}</span>{% endif %}
+        </div>
+        <div class="skin-body">
+          <div class="skin-game">{{ l.game_name }} · {{ l.category_name }}</div>
+          <div class="skin-name">{{ l.item_name }}</div>
+          <div class="skin-meta">
+            <span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span>
+            <span class="muted">{{ l.qty }} шт.</span>
+          </div>
+          <div class="skin-price">{{ l.price|money }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">У продавца сейчас нет активных объявлений. Загляните позже.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Отзывы покупателей</h2>
+  {% if reviews %}
+    <div class="review-list">
+      {% for r in reviews %}
+        <article class="review-item">
+          {% if r.buyer_avatar %}
+            <img class="user-avatar" src="{{ r.buyer_avatar }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+          {% else %}
+            <span class="user-avatar user-avatar-ph">{{ (r.buyer_name or r.buyer_login)|initials }}</span>
+          {% endif %}
+          <div class="review-body">
+            <div class="review-head">
+              <b>{{ r.buyer_name or r.buyer_login }}</b>
+              <span class="stars" aria-label="Оценка {{ r.rating }} из 5">{{ '★' * r.rating }}{{ '☆' * (5 - r.rating) }}</span>
+              <span class="muted small">{{ r.created_at|dt }}</span>
+            </div>
+            {% if r.review_text %}<p>{{ r.review_text }}</p>{% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Отзывов пока нет.</p>
+  {% endif %}
+</section>
+{% endblock %}

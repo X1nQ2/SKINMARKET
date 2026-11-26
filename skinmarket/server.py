@@ -1,27 +1,33 @@
 """SKINMARKET: маркетплейс игровых скинов (Flask + Access)."""
+import csv
+import io
 import json
 import os
 import re
 import secrets
 import threading
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import (Flask, abort, flash, g, redirect, render_template, request,
-                   session, url_for)
+from flask import (Flask, Response, abort, flash, g, redirect, render_template,
+                   request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import Db, join_sql
+from games import ALLOWED_GAMES, RETIRED_GAMES
+import order_flow
+from order_chat import (MAX_MESSAGE_LEN, MAX_TRADE_URL_LEN, conversations,
+                        ensure_chat_schema, mark_order_read, normalize_trade_url,
+                        order_messages, send_message, unread_count)
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 app = Flask(__name__)
-# Пустой DB_PATH в .env/переменных Windows не должен превращаться в путь
-# к текущей папке VS Code. Относительные пути считаем от папки проекта.
 _db_path_setting = (os.getenv("DB_PATH") or "").strip()
 if not _db_path_setting:
     _db_path_setting = str(BASE_DIR / "database.accdb")
@@ -244,6 +250,16 @@ def dt_filter(value):
     return value.strftime("%d.%m.%Y %H:%M") if value else ""
 
 
+@app.template_filter("date")
+def date_filter(value):
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value.strftime("%d.%m.%Y") if value else ""
+
+
 @app.template_filter("rarity_cls")
 def rarity_cls(name):
     return RARITY_CLASS.get(name, "common")
@@ -302,6 +318,11 @@ def load_user_and_check_csrf():
         sent = request.form.get("csrf_token", "")
         if not sent or not secrets.compare_digest(sent, session.get("csrf_token", "")):
             abort(400)
+    try:
+        ensure_chat_schema(get_db())
+        order_flow.ensure_order_schema(get_db())
+    except Exception:
+        app.logger.exception("Не удалось подготовить таблицы чата, сделки и Steam Trade URL")
     g.user = None
     user_id = session.get("uid")
     if user_id:
@@ -317,14 +338,23 @@ def load_user_and_check_csrf():
             g.user = row
         else:
             session.pop("uid", None)
+    # Ленивое автоподтверждение: отдельного планировщика в учебном проекте нет.
+    auto_confirm_orders(get_db())
 
 
 @app.context_processor
 def inject_globals():
     cart_count = 0
+    unread_messages = 0
     if g.get("user"):
         cart_count = sum(get_cart(g.user["user_id"]).values())
+        try:
+            unread_messages = unread_count(get_db(), g.user["user_id"])
+        except Exception:
+            app.logger.debug("Не удалось посчитать непрочитанные сообщения")
     return {"csrf_token": csrf_token, "user": g.get("user"), "cart_count": cart_count,
+            "unread_messages": unread_messages,
+            "max_message_len": MAX_MESSAGE_LEN, "max_trade_url_len": MAX_TRADE_URL_LEN,
             "ROLE_SELLER": ROLE_SELLER, "ROLE_ADMIN": ROLE_ADMIN}
 
 
@@ -381,7 +411,8 @@ ORDER_COLS = (
     "z.КодЗаказа AS order_id, z.Количество AS qty, z.Сумма AS order_sum, "
     "z.ДатаЗаказа AS created_at, z.КодСтатуса AS status_id, st.НазваниеСтатуса AS status_name, "
     "z.КодПокупателя AS buyer_id, b.Логин AS buyer_login, o.КодПродавца AS seller_id, "
-    "u.Логин AS seller_login, o.КодОбъявления AS listing_id, t.Название AS item_name"
+    "u.Логин AS seller_login, o.КодОбъявления AS listing_id, t.Название AS item_name, "
+    "z.ДатаОтправки AS sent_at, z.ПричинаСпора AS dispute_reason"
 )
 
 
@@ -389,8 +420,83 @@ def fetch_listing(db, listing_id):
     return db.one(f"SELECT {LISTING_COLS} FROM {LISTING_FROM} WHERE o.КодОбъявления = ?", (listing_id,))
 
 
+INTERNAL_DESCRIPTION_PREFIX = "Предмет из инвентаря Steam"
+_DESCRIPTION_RETRY = {}
+
+
+def attach_steam_profiles(db, rows, id_key, login_key, name_key, avatar_key, url_key):
+    """Добавляет к строкам ник, аватар и ссылку Steam по коду пользователя."""
+    user_ids = {row[id_key] for row in rows if row.get(id_key)}
+    profiles = {}
+    if user_ids and not app.config.get("TESTING"):
+        for user_id in user_ids:
+            try:
+                link = db.one("SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?", (user_id,))
+                if link:
+                    profiles[user_id] = steam_profile(link["SteamID"])
+            except Exception:
+                app.logger.debug("Не удалось получить профиль Steam пользователя %s", user_id)
+    for row in rows:
+        profile = profiles.get(row[id_key], {})
+        row[name_key] = profile.get("name") or row.get(login_key) or "Пользователь"
+        row[avatar_key] = profile.get("avatar")
+        row[url_key] = profile.get("profile_url")
+    return rows
+
+
+def attach_seller_names(db, rows):
+    """Ник и аватар продавца для карточек товара и заказов."""
+    return attach_steam_profiles(db, rows, "seller_id", "seller_login",
+                                 "seller_name", "seller_avatar", "seller_profile_url")
+
+
+def attach_buyer_names(db, rows):
+    """Ник и аватар покупателя для страницы «Заказы покупателей»."""
+    return attach_steam_profiles(db, rows, "buyer_id", "buyer_login",
+                                 "buyer_name", "buyer_avatar", "buyer_profile_url")
+
+
+def steam_description_for_listing(db, listing):
+    """Возвращает описание предмета из Steam, обновляя старые служебные описания."""
+    description = (listing.get("item_desc") or "").strip()
+    if description and not description.startswith(INTERNAL_DESCRIPTION_PREFIX):
+        return description
+    if app.config.get("TESTING"):
+        return None
+    mapping = db.one(
+        "SELECT SteamID, AppID, AssetID FROM SteamInventoryListings WHERE КодОбъявления = ?",
+        (listing["listing_id"],),
+    )
+    if not mapping:
+        return None
+    key = (str(mapping["SteamID"]), str(mapping["AppID"]), str(mapping["AssetID"]))
+    if _DESCRIPTION_RETRY.get(key, 0) > time.time():
+        return None
+    try:
+        items = fetch_game_inventory(mapping["SteamID"], mapping["AppID"])
+    except SteamInventoryError:
+        _DESCRIPTION_RETRY[key] = time.time() + 300
+        return None
+    except Exception:
+        _DESCRIPTION_RETRY[key] = time.time() + 300
+        app.logger.exception("Не удалось загрузить описание предмета из Steam")
+        return None
+    item = next((x for x in items if x["assetid"] == str(mapping["AssetID"])), None)
+    text = (item.get("description") or "").strip() if item else ""
+    if text:
+        db.execute("UPDATE Товары SET Описание = ? WHERE КодТовара = ?", (text, listing["item_id"]))
+        listing["item_desc"] = text
+        return text
+    _DESCRIPTION_RETRY[key] = time.time() + 300
+    return None
+
+
 def reference_data(db):
-    games = db.query("SELECT КодИгры AS game_id, НазваниеИгры AS game_name FROM Игры ORDER BY НазваниеИгры")
+    placeholders = ", ".join("?" for _ in ALLOWED_GAMES)
+    games = db.query(
+        f"SELECT КодИгры AS game_id, НазваниеИгры AS game_name FROM Игры "
+        f"WHERE НазваниеИгры IN ({placeholders}) ORDER BY НазваниеИгры",
+        tuple(ALLOWED_GAMES))
     for game in games:
         game["logo"] = game_logo(game)
     return {
@@ -454,23 +560,99 @@ def fetch_order(db, order_id):
     return db.one(f"SELECT {ORDER_COLS} FROM {ORDER_FROM} WHERE z.КодЗаказа = ?", (order_id,))
 
 
-def complete_order(db, order):
-    if order["status_id"] != lookup("order", "Оплачен"):
+def order_status_css(name):
+    """CSS-класс для цветного статуса заказа."""
+    return {
+        order_flow.PAID: "paid",
+        order_flow.SENT: "sent",
+        order_flow.DISPUTE: "dispute",
+        order_flow.DONE: "done",
+        order_flow.CANCELLED: "cancelled",
+    }.get(name, "muted")
+
+
+def mark_order_sent(db, order):
+    """Продавец отправил предмет: деньги пока остаются у платформы."""
+    paid_id = lookup("order", order_flow.PAID)
+    if order["status_id"] != paid_id:
+        raise ShopError("Отправить можно только оплаченный заказ.")
+    changed = db.execute(
+        "UPDATE Заказы SET КодСтатуса = ?, ДатаОтправки = ? "
+        "WHERE КодЗаказа = ? AND КодСтатуса = ?",
+        (lookup("order", order_flow.SENT), db.now(), order["order_id"], paid_id))
+    if changed != 1:
         raise ShopError("Заказ уже обработан.")
+
+
+def payout_order(db, order, from_status):
+    """Закрывает заказ в пользу продавца: деньги уходят на его баланс."""
     total = D(order["order_sum"])
-    db.execute("UPDATE Заказы SET КодСтатуса = ? WHERE КодЗаказа = ?",
-               (lookup("order", "Выполнен"), order["order_id"]))
+    changed = db.execute(
+        "UPDATE Заказы SET КодСтатуса = ? WHERE КодЗаказа = ? AND КодСтатуса = ?",
+        (lookup("order", order_flow.DONE), order["order_id"], lookup("order", from_status)))
+    if changed != 1:
+        raise ShopError("Заказ уже обработан.")
     db.execute("UPDATE Пользователи SET Баланс = Баланс + ? WHERE КодПользователя = ?",
                (total, order["seller_id"]))
     add_transaction(db, order["seller_id"], order["order_id"], "Продажа", total)
 
 
+def refund_order(db, order, from_status):
+    """Закрывает заказ в пользу покупателя.
+
+    Количество не возвращаем: предмет уже мог быть отправлен, повторно
+    выставлять его в каталог нельзя.
+    """
+    total = D(order["order_sum"])
+    changed = db.execute(
+        "UPDATE Заказы SET КодСтатуса = ? WHERE КодЗаказа = ? AND КодСтатуса = ?",
+        (lookup("order", order_flow.CANCELLED), order["order_id"], lookup("order", from_status)))
+    if changed != 1:
+        raise ShopError("Заказ уже обработан.")
+    db.execute("UPDATE Пользователи SET Баланс = Баланс + ? WHERE КодПользователя = ?",
+               (total, order["buyer_id"]))
+    add_transaction(db, order["buyer_id"], order["order_id"], "Возврат", total)
+
+
+def open_dispute(db, order, reason):
+    """Покупатель открывает спор: выплата замораживается до решения админа."""
+    sent_id = lookup("order", order_flow.SENT)
+    if order["status_id"] != sent_id:
+        raise ShopError("Спор можно открыть только по отправленному заказу.")
+    changed = db.execute(
+        "UPDATE Заказы SET КодСтатуса = ?, ПричинаСпора = ? "
+        "WHERE КодЗаказа = ? AND КодСтатуса = ?",
+        (lookup("order", order_flow.DISPUTE), reason or None, order["order_id"], sent_id))
+    if changed != 1:
+        raise ShopError("Заказ уже обработан.")
+
+
+def auto_confirm_orders(db):
+    """Ленивое автоподтверждение: закрывает заказы, отправленные 24 часа назад."""
+    try:
+        rows = db.query(
+            f"SELECT {ORDER_COLS} FROM {ORDER_FROM} WHERE z.КодСтатуса = ?",
+            (lookup("order", order_flow.SENT),))
+        now = datetime.now()
+        changed = False
+        for order in rows:
+            if order_flow.is_due(order, now):
+                payout_order(db, order, order_flow.SENT)
+                changed = True
+        if changed:
+            db.commit()
+    except Exception:
+        db.rollback()
+        app.logger.exception("Не удалось автоматически подтвердить заказы")
+
+
 def cancel_order(db, order):
-    if order["status_id"] != lookup("order", "Оплачен"):
-        raise ShopError("Отменить можно только оплаченный заказ.")
+    paid_id = lookup("order", order_flow.PAID)
+    if order["status_id"] != paid_id:
+        raise ShopError("Отменить можно только оплаченный заказ: после отправки откройте спор.")
     total = D(order["order_sum"])
     db.execute("UPDATE Заказы SET КодСтатуса = ? WHERE КодЗаказа = ?",
-               (lookup("order", "Отменён"), order["order_id"]))
+               (lookup("order", order_flow.CANCELLED), order["order_id"]))
     db.execute("UPDATE Пользователи SET Баланс = Баланс + ? WHERE КодПользователя = ?",
                (total, order["buyer_id"]))
     add_transaction(db, order["buyer_id"], order["order_id"], "Возврат", total)
@@ -492,7 +674,9 @@ def catalog():
     if sort not in SORTS:
         sort = "new"
 
-    where, params = ["o.КодСтатуса = ?", "o.Количество > 0"], [lookup("listing", "Активно")]
+    where = ["i.НазваниеИгры IN (" + ", ".join("?" for _ in ALLOWED_GAMES) + ")",
+             "o.КодСтатуса = ?", "o.Количество > 0"]
+    params = [*ALLOWED_GAMES, lookup("listing", "Активно")]
     for column, value in (("t.КодИгры", game_id), ("t.КодКатегории", category_id), ("t.КодРедкости", rarity_id)):
         if value:
             where.append(f"{column} = ?")
@@ -511,6 +695,7 @@ def catalog():
     if q:
         needle = q.casefold()
         rows = [r for r in rows if needle in r["item_name"].casefold() or needle in r["game_name"].casefold()]
+    attach_seller_names(db, rows)
 
     per_page = app.config["PER_PAGE"]
     pages = max(1, -(-len(rows) // per_page))
@@ -537,8 +722,66 @@ def listing_page(listing_id):
         + " WHERE o.КодПродавца = ? ORDER BY v.КодОтзыва DESC", (listing["seller_id"],))
     rating = round(sum(r["rating"] for r in reviews) / len(reviews), 1) if reviews else None
     available = listing["status_id"] == lookup("listing", "Активно") and listing["qty"] > 0
+    attach_seller_names(db, [listing])
+    description = steam_description_for_listing(db, listing)
     return render_template("listing.html", l=listing, reviews=reviews[:10], rating=rating,
-                           reviews_count=len(reviews), available=available)
+                           reviews_count=len(reviews), available=available,
+                           product_description=description)
+
+
+def seller_reviews(db, seller_id, limit=None):
+    """Отзывы о продавце, начиная с последних, вместе с данными покупателя."""
+    rows = db.query(
+        "SELECT v.Оценка AS rating, v.Комментарий AS review_text, v.ДатаОтзыва AS created_at, "
+        "z.КодПокупателя AS buyer_id, b.Логин AS buyer_login "
+        "FROM " + join_sql("Отзывы AS v", ("Заказы AS z", "v.КодЗаказа = z.КодЗаказа"),
+                           ("Объявления AS o", "z.КодОбъявления = o.КодОбъявления"),
+                           ("Пользователи AS b", "z.КодПокупателя = b.КодПользователя"))
+        + " WHERE o.КодПродавца = ? ORDER BY v.КодОтзыва DESC", (seller_id,))
+    return rows[:limit] if limit else rows
+
+
+@app.get("/seller/<int:seller_id>")
+def seller_page(seller_id):
+    """Публичная страница продавца: рейтинг, объявления, отзывы."""
+    db = get_db()
+    seller = db.one(
+        "SELECT u.КодПользователя AS user_id, u.Логин AS login, u.ДатаРегистрации AS created_at, "
+        "r.НазваниеРоли AS role_name "
+        "FROM " + join_sql("Пользователи AS u", ("Роли AS r", "u.КодРоли = r.КодРоли"))
+        + " WHERE u.КодПользователя = ?", (seller_id,))
+    if not seller:
+        abort(404)
+    seller["seller_id"] = seller["user_id"]
+    seller["seller_login"] = seller["login"]
+    attach_seller_names(db, [seller])
+    # Технический логин Steam не показываем, если профиль Steam не удалось получить.
+    if seller["seller_name"] == seller["login"] and str(seller["login"]).startswith("steam_"):
+        seller["seller_name"] = "Продавец"
+
+    listings = db.query(
+        f"SELECT {LISTING_COLS} FROM {LISTING_FROM} "
+        "WHERE o.КодПродавца = ? AND o.КодСтатуса = ? AND o.Количество > 0 "
+        "ORDER BY o.КодОбъявления DESC",
+        (seller_id, lookup("listing", "Активно")))
+    attach_seller_names(db, listings)
+
+    reviews = seller_reviews(db, seller_id)
+    reviews_count = len(reviews)
+    rating = round(sum(r["rating"] for r in reviews) / reviews_count, 1) if reviews_count else None
+    attach_buyer_names(db, reviews)
+    deals = db.one(
+        "SELECT COUNT(*) AS cnt FROM " + join_sql(
+            "Заказы AS z", ("Объявления AS o", "z.КодОбъявления = o.КодОбъявления"))
+        + " WHERE o.КодПродавца = ? AND z.КодСтатуса = ?",
+        (seller_id, lookup("order", "Выполнен")))["cnt"]
+
+    contact_url = seller["seller_profile_url"] or url_for("contacts")
+    return render_template(
+        "seller.html", seller=seller, listings=listings, reviews=reviews[:20],
+        rating=rating, reviews_count=reviews_count, deals=deals,
+        contact_url=contact_url, contact_external=bool(seller["seller_profile_url"]),
+    )
 
 
 # ------------------------------------------------------ регистрация и вход
@@ -581,10 +824,27 @@ def logout():
 @app.get("/profile")
 @login_required
 def profile():
-    transactions = get_db().query(
+    db = get_db()
+    transactions = db.query(
         "SELECT Тип AS trans_type, Сумма AS amount, Дата AS created_at, КодЗаказа AS order_id "
         "FROM Транзакции WHERE КодПользователя = ? ORDER BY КодТранзакции DESC", (g.user["user_id"],))
-    return render_template("profile.html", transactions=transactions[:50])
+    trade = db.one("SELECT SteamTradeURL AS trade_url FROM Пользователи WHERE КодПользователя = ?",
+                   (g.user["user_id"],))
+    return render_template("profile.html", transactions=transactions[:50],
+                           trade_url=(trade or {}).get("trade_url") or "")
+
+
+@app.post("/profile/trade-url")
+@login_required
+def profile_trade_url():
+    url, error = normalize_trade_url(request.form.get("trade_url", ""))
+    if error:
+        flash(error, "error")
+        return redirect(url_for("profile"))
+    get_db().execute("UPDATE Пользователи SET SteamTradeURL = ? WHERE КодПользователя = ?",
+                     (url or None, g.user["user_id"]))
+    flash("Steam Trade URL сохранён." if url else "Steam Trade URL удалён.", "success")
+    return redirect(url_for("profile"))
 
 
 @app.post("/profile/topup")
@@ -647,6 +907,7 @@ def cart():
         if ok:
             total += line
         items.append(listing)
+    attach_seller_names(db, items)
     return render_template("cart.html", items=items, total=total, all_ok=all(i["ok"] for i in items))
 
 
@@ -720,23 +981,96 @@ def orders():
     rows = db.query(f"SELECT {ORDER_COLS} FROM {ORDER_FROM} WHERE z.КодПокупателя = ? ORDER BY z.КодЗаказа DESC",
                     (g.user["user_id"],))
     reviewed = {r["order_id"] for r in db.query("SELECT КодЗаказа AS order_id FROM Отзывы")}
-    paid, done = lookup("order", "Оплачен"), lookup("order", "Выполнен")
+    paid, sent = lookup("order", order_flow.PAID), lookup("order", order_flow.SENT)
+    done = lookup("order", order_flow.DONE)
     for row in rows:
         row.update(can_cancel=row["status_id"] == paid,
+                   can_confirm=row["status_id"] == sent,
+                   can_dispute=row["status_id"] == sent,
                    can_review=row["status_id"] == done and row["order_id"] not in reviewed,
-                   reviewed=row["order_id"] in reviewed)
+                   reviewed=row["order_id"] in reviewed,
+                   status_css=order_status_css(row["status_name"]),
+                   auto_confirm_at=order_flow.confirm_deadline(row))
+    attach_seller_names(db, rows)
     return render_template("orders.html", orders=rows)
 
 
 @app.get("/sales")
 @roles_required(ROLE_SELLER, ROLE_ADMIN)
 def sales():
-    rows = get_db().query(f"SELECT {ORDER_COLS} FROM {ORDER_FROM} WHERE o.КодПродавца = ? ORDER BY z.КодЗаказа DESC",
-                          (g.user["user_id"],))
-    paid = lookup("order", "Оплачен")
+    db = get_db()
+    rows = db.query(f"SELECT {ORDER_COLS} FROM {ORDER_FROM} WHERE o.КодПродавца = ? ORDER BY z.КодЗаказа DESC",
+                    (g.user["user_id"],))
+    attach_buyer_names(db, rows)
+    paid = lookup("order", order_flow.PAID)
+    sent = lookup("order", order_flow.SENT)
     for row in rows:
-        row["open"] = row["status_id"] == paid
+        row["can_send"] = row["status_id"] == paid
+        row["open"] = row["can_send"]
+        row["awaiting"] = row["status_id"] == sent
+        row["status_css"] = order_status_css(row["status_name"])
+        row["auto_confirm_at"] = order_flow.confirm_deadline(row)
     return render_template("sales.html", orders=rows)
+
+
+@app.get("/orders/<int:order_id>")
+@login_required
+def order_detail(order_id):
+    db, order = order_action(order_id, "any")
+    mark_order_read(db, order_id, g.user["user_id"])
+    messages = order_messages(db, order_id)
+    attach_seller_names(db, [order])
+    attach_buyer_names(db, [order])
+    is_buyer = g.user["user_id"] == order["buyer_id"]
+    trade = db.one("SELECT SteamTradeURL AS trade_url FROM Пользователи WHERE КодПользователя = ?",
+                   (order["seller_id"],))
+    trade_url = (trade or {}).get("trade_url") or ""
+    can_send = not is_buyer and order["status_id"] == lookup("order", order_flow.PAID)
+    can_confirm = is_buyer and order["status_id"] == lookup("order", order_flow.SENT)
+    if is_buyer:
+        counterpart_name = order["seller_name"]
+        counterpart_avatar = order["seller_avatar"]
+        counterpart_login = order["seller_login"]
+        seller_page_url = url_for("seller_page", seller_id=order["seller_id"])
+    else:
+        counterpart_name = order["buyer_name"]
+        counterpart_avatar = order["buyer_avatar"]
+        counterpart_login = order["buyer_login"]
+        seller_page_url = None
+    return render_template(
+        "order_detail.html", o=order, messages=messages, is_buyer=is_buyer,
+        trade_url=trade_url, counterpart_name=counterpart_name,
+        counterpart_avatar=counterpart_avatar, counterpart_login=counterpart_login,
+        seller_page_url=seller_page_url, can_send=can_send, can_confirm=can_confirm,
+        can_dispute=can_confirm, status_css=order_status_css(order["status_name"]),
+        auto_confirm_at=order_flow.confirm_deadline(order)
+        if order["status_id"] == lookup("order", order_flow.SENT) else None,
+    )
+
+
+@app.post("/orders/<int:order_id>/messages")
+@login_required
+def order_send_message(order_id):
+    db, order = order_action(order_id, "any")
+    text = request.form.get("text", "").strip()
+    if not text:
+        flash("Введите сообщение.", "error")
+    elif len(text) > MAX_MESSAGE_LEN:
+        flash(f"Сообщение слишком длинное: максимум {MAX_MESSAGE_LEN} символов.", "error")
+    else:
+        send_message(db, order_id, g.user["user_id"], text)
+    return redirect(url_for("order_detail", order_id=order_id, _anchor="chat"))
+
+
+@app.get("/messages")
+@login_required
+def messages():
+    db = get_db()
+    rows = conversations(db, g.user["user_id"])
+    attach_steam_profiles(db, rows, "counterpart_id", "counterpart_login",
+                          "counterpart_name", "counterpart_avatar",
+                          "counterpart_profile_url")
+    return render_template("messages.html", conversations=rows)
 
 
 def order_action(order_id, who):
@@ -744,23 +1078,59 @@ def order_action(order_id, who):
     order = fetch_order(db, order_id)
     if not order:
         abort(404)
-    allowed = {"seller": [order["seller_id"]], "any": [order["seller_id"], order["buyer_id"]]}[who]
+    allowed = {
+        "seller": [order["seller_id"]],
+        "buyer": [order["buyer_id"]],
+        "any": [order["seller_id"], order["buyer_id"]],
+    }[who]
     if g.user["user_id"] not in allowed:
         abort(403)
     return db, order
 
 
-@app.post("/orders/<int:order_id>/complete")
+@app.post("/orders/<int:order_id>/send")
 @roles_required(ROLE_SELLER, ROLE_ADMIN)
-def order_complete(order_id):
+def order_send(order_id):
+    """Продавец отметил, что предмет отправлен. Деньги ещё удерживаются."""
     db, order = order_action(order_id, "seller")
     try:
-        complete_order(db, order)
-        flash("Заказ выполнен, деньги зачислены на ваш баланс.", "success")
+        mark_order_sent(db, order)
+        flash("Предмет отправлен. Покупатель должен подтвердить получение в течение 24 часов.", "success")
     except ShopError as error:
         db.rollback()
         flash(str(error), "error")
     return redirect(url_for("sales"))
+
+
+@app.post("/orders/<int:order_id>/confirm")
+@login_required
+def order_confirm(order_id):
+    """Покупатель подтвердил получение — деньги переходят продавцу."""
+    db, order = order_action(order_id, "buyer")
+    try:
+        payout_order(db, order, order_flow.SENT)
+        flash("Получение подтверждено, деньги переведены продавцу.", "success")
+    except ShopError as error:
+        db.rollback()
+        flash(str(error), "error")
+    return redirect(url_for("orders"))
+
+
+@app.post("/orders/<int:order_id>/dispute")
+@login_required
+def order_dispute(order_id):
+    """Покупатель открывает спор: заказ уходит на рассмотрение администратору."""
+    db, order = order_action(order_id, "buyer")
+    reason = " ".join((request.form.get("reason") or "").split())[:500]
+    try:
+        if len(reason) < 5:
+            raise ShopError("Опишите проблему: от 5 до 500 символов.")
+        open_dispute(db, order, reason)
+        flash("Спор открыт. Администратор проверит заказ и решит, кому вернуть деньги.", "success")
+    except ShopError as error:
+        db.rollback()
+        flash(str(error), "error")
+    return redirect(url_for("order_detail", order_id=order_id, _anchor="dispute"))
 
 
 @app.post("/orders/<int:order_id>/cancel")
@@ -804,86 +1174,25 @@ def order_review(order_id):
 @app.get("/sell")
 @roles_required(ROLE_SELLER, ROLE_ADMIN)
 def sell():
-    rows = get_db().query(
+    db = get_db()
+    rows = db.query(
         f"SELECT {LISTING_COLS} FROM {LISTING_FROM} WHERE o.КодПродавца = ? ORDER BY o.КодОбъявления DESC",
         (g.user["user_id"],))
-    return render_template("sell.html", listings=rows, active=lookup("listing", "Активно"))
-
-
-def create_listing(db, seller_id, item_id, price, qty):
-    return db.insert("INSERT INTO Объявления (КодПродавца, КодТовара, Цена, Количество, КодСтатуса, ДатаСоздания) "
-                     "VALUES (?, ?, ?, ?, ?, ?)",
-                     (seller_id, item_id, price, qty, lookup("listing", "Активно"), db.now()))
-
-
-def parse_item_form(form, ref):
-    """Проверяет поля товара (игра, категория, редкость, название, описание)."""
-    game_id, category_id, rarity_id = (to_int(form.get(k)) for k in ("game", "category", "rarity"))
-    name = " ".join(form.get("name", "").split())
-    description = form.get("description", "").strip()[:1000]
-    category = next((c for c in ref["categories"] if c["category_id"] == category_id), None)
-    if not any(x["game_id"] == game_id for x in ref["games"]) or not category or category["game_id"] != game_id:
-        raise ShopError("Выберите игру и подходящую категорию.")
-    if not any(x["rarity_id"] == rarity_id for x in ref["rarities"]):
-        raise ShopError("Выберите редкость.")
-    if not 2 <= len(name) <= 120:
-        raise ShopError("Название: от 2 до 120 символов.")
-    return game_id, category_id, rarity_id, name, description
-
-
-def find_or_create_item(db, game_id, category_id, rarity_id, name, description, image):
-    """Один и тот же скин в одной игре — одна запись каталога (с общей картинкой)."""
-    item = db.one("SELECT КодТовара AS item_id, URLИзображения AS image_url, Описание AS descr "
-                  "FROM Товары WHERE КодИгры = ? AND Название = ?", (game_id, name))
-    if item:
-        if image and not item["image_url"]:
-            db.execute("UPDATE Товары SET URLИзображения = ? WHERE КодТовара = ?", (image, item["item_id"]))
-        if description and not item["descr"]:
-            db.execute("UPDATE Товары SET Описание = ? WHERE КодТовара = ?", (description, item["item_id"]))
-        return item["item_id"], False
-    item_id = db.insert(
-        "INSERT INTO Товары (КодИгры, КодКатегории, КодРедкости, Название, Описание, URLИзображения) "
-        "VALUES (?, ?, ?, ?, ?, ?)", (game_id, category_id, rarity_id, name, description or None, image))
-    return item_id, True
-
-
-def item_names(db):
-    return [r["name"] for r in db.query("SELECT DISTINCT Название AS name FROM Товары ORDER BY Название")][:500]
-
-
-@app.route("/sell/new", methods=["GET", "POST"])
-@roles_required(ROLE_SELLER, ROLE_ADMIN)
-def sell_new():
-    # New listings are created by selecting an actual item from Steam inventory.
-    linked = get_db().one("SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?", (g.user["user_id"],))
-    if linked:
-        return redirect(url_for("steam_inventory_page"))
-    flash("Сначала привяжите аккаунт Steam, чтобы выбрать предмет из инвентаря.", "error")
-    return redirect(url_for("profile"))
-    db = get_db()
-    ref = reference_data(db)
-    ref["item_names"] = item_names(db)
-    form = request.form
-    if request.method == "POST":
-        try:
-            game_id, category_id, rarity_id, name, description = parse_item_form(form, ref)
-            qty = to_int(form.get("qty"))
-            price = parse_money(form.get("price", ""))
-            if qty is None or not 1 <= qty <= 9999:
-                raise ShopError("Количество: от 1 до 9999.")
-            image = read_image(form, request.files)
-        except ShopError as error:
-            flash(str(error), "error")
-            return render_template("sell_new.html", **ref), 400
-        item_id, _created = find_or_create_item(db, game_id, category_id, rarity_id, name, description, image)
-        create_listing(db, g.user["user_id"], item_id, price, qty)
-        flash("Объявление опубликовано.", "success")
-        return redirect(url_for("sell"))
-    return render_template("sell_new.html", **ref)
+    categories = db.query(
+        "SELECT КодКатегории AS category_id, КодИгры AS game_id, НазваниеКатегории AS category_name "
+        "FROM Категории ORDER BY НазваниеКатегории")
+    by_game = {}
+    for category in categories:
+        by_game.setdefault(category["game_id"], []).append(category)
+    for row in rows:
+        row["categories"] = by_game.get(row["game_id"], [])
+    rarities = db.query("SELECT НазваниеРедкости AS rarity_name FROM Редкости ORDER BY НазваниеРедкости")
+    return render_template("sell.html", listings=rows, active=lookup("listing", "Активно"),
+                           rarity_options=[r["rarity_name"] for r in rarities])
 
 
 def own_listing(db, listing_id):
-    row = db.one("SELECT КодПродавца AS seller_id, КодСтатуса AS status_id FROM Объявления WHERE КодОбъявления = ?",
+    row = db.one(f"SELECT {LISTING_COLS} FROM {LISTING_FROM} WHERE o.КодОбъявления = ?",
                  (listing_id,))
     if not row:
         abort(404)
@@ -892,23 +1201,60 @@ def own_listing(db, listing_id):
     return row
 
 
+@app.get("/sell/new")
+@roles_required(ROLE_SELLER, ROLE_ADMIN)
+def sell_new():
+    """Новые объявления создаются только из реального инвентаря Steam."""
+    linked = get_db().one("SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?", (g.user["user_id"],))
+    if linked:
+        return redirect(url_for("steam_inventory_page"))
+    flash("Сначала привяжите аккаунт Steam, чтобы выбрать предмет из инвентаря.", "error")
+    return redirect(url_for("profile"))
+
+
 @app.post("/sell/<int:listing_id>/update")
 @roles_required(ROLE_SELLER, ROLE_ADMIN)
 def sell_update(listing_id):
     db = get_db()
-    own_listing(db, listing_id)
-    try:
-        price = parse_money(request.form.get("price", ""))
-        qty = to_int(request.form.get("qty"))
-        if qty is None or not 0 <= qty <= 9999:
-            raise ShopError("Количество: от 0 до 9999.")
-    except ShopError as error:
-        flash(str(error), "error")
-        return redirect(url_for("sell"))
-    status = lookup("listing", "Активно") if qty > 0 else lookup("listing", "Продано")
-    db.execute("UPDATE Объявления SET Цена = ?, Количество = ?, КодСтатуса = ? WHERE КодОбъявления = ?",
-               (price, qty, status, listing_id))
-    flash("Объявление обновлено.", "success")
+    listing = own_listing(db, listing_id)
+    changes = []
+
+    raw_price = (request.form.get("price") or "").strip()
+    if raw_price:
+        try:
+            price = parse_money(raw_price)
+        except ShopError as error:
+            flash(str(error), "error")
+            return redirect(url_for("sell"))
+        # Количество не меняем: один предмет из инвентаря Steam — одно объявление.
+        db.execute("UPDATE Объявления SET Цена = ? WHERE КодОбъявления = ?", (price, listing_id))
+        changes.append("цена")
+
+    category_name = " ".join((request.form.get("category") or "").split())[:40]
+    if category_name and category_name != listing["category_name"]:
+        category = db.one(
+            "SELECT КодКатегории AS id FROM Категории WHERE КодИгры = ? AND НазваниеКатегории = ?",
+            (listing["game_id"], category_name),
+        )
+        category_id = category["id"] if category else db.insert(
+            "INSERT INTO Категории (КодИгры, НазваниеКатегории) VALUES (?, ?)",
+            (listing["game_id"], category_name))
+        db.execute("UPDATE Товары SET КодКатегории = ? WHERE КодТовара = ?",
+                   (category_id, listing["item_id"]))
+        changes.append("категория")
+
+    rarity_name = (request.form.get("rarity") or "").strip()
+    if rarity_name and rarity_name != listing["rarity_name"]:
+        rarity = db.one("SELECT КодРедкости AS id FROM Редкости WHERE НазваниеРедкости = ?", (rarity_name,))
+        if rarity:
+            db.execute("UPDATE Товары SET КодРедкости = ? WHERE КодТовара = ?",
+                       (rarity["id"], listing["item_id"]))
+            changes.append("редкость")
+
+    if changes:
+        flash("Обновлено: " + ", ".join(changes) + ".", "success")
+    else:
+        flash("Изменений нет.", "error")
     return redirect(url_for("sell"))
 
 
@@ -919,7 +1265,12 @@ def sell_remove(listing_id):
     own_listing(db, listing_id)
     db.execute("UPDATE Объявления SET КодСтатуса = ? WHERE КодОбъявления = ?",
                (lookup("listing", "Снято"), listing_id))
-    flash("Объявление снято с продажи.", "success")
+    # Освобождаем предмет: после снятия его можно снова добавить из инвентаря.
+    try:
+        db.execute("DELETE FROM SteamInventoryListings WHERE КодОбъявления = ?", (listing_id,))
+    except Exception:
+        pass  # таблицы может не быть, если объявление создано старым способом
+    flash("Объявление снято с продажи. Предмет снова доступен в инвентаре Steam.", "success")
     return redirect(url_for("sell"))
 
 
@@ -935,16 +1286,142 @@ def admin():
         + " ORDER BY u.КодПользователя")
     listings = db.query(f"SELECT {LISTING_COLS} FROM {LISTING_FROM} ORDER BY o.КодОбъявления DESC")
     orders_all = db.query(f"SELECT {ORDER_COLS} FROM {ORDER_FROM} ORDER BY z.КодЗаказа DESC")
-    done = lookup("order", "Выполнен")
+    done = lookup("order", order_flow.DONE)
+    dispute_id = lookup("order", order_flow.DISPUTE)
+    completed = [order for order in orders_all if order["status_id"] == done]
+    disputes = [order for order in orders_all if order["status_id"] == dispute_id]
+    for order in orders_all:
+        order["status_css"] = order_status_css(order["status_name"])
+    attach_buyer_names(db, disputes)
+    attach_seller_names(db, disputes)
+    turnover = sum((D(order["order_sum"]) for order in completed), Decimal("0"))
     stats = {
         "users": len(users),
+        "active_users": sum(1 for user in users if not user["blocked"]),
         "listings": sum(1 for x in listings if x["status_name"] == "Активно"),
         "orders": len(orders_all),
-        "turnover": sum((D(o["order_sum"]) for o in orders_all if o["status_id"] == done), Decimal("0")),
+        "completed": len(completed),
+        "turnover": turnover,
+        "avg_check": turnover / len(completed) if completed else Decimal("0"),
     }
+
+    # Продажи за последние 14 дней — считаем в Python, чтобы одинаково работать в Access и SQLite.
+    today = datetime.now().date()
+    buckets = {
+        today - timedelta(days=offset): {"count": 0, "sum": Decimal("0")}
+        for offset in range(13, -1, -1)
+    }
+    for order in completed:
+        created = order["created_at"]
+        if isinstance(created, str):
+            try:
+                created = datetime.fromisoformat(created)
+            except ValueError:
+                continue
+        if not created:
+            continue
+        day = created.date()
+        if day in buckets:
+            buckets[day]["count"] += 1
+            buckets[day]["sum"] += D(order["order_sum"])
+    max_day_sum = max((bucket["sum"] for bucket in buckets.values()), default=Decimal("0"))
+    sales_by_day = [
+        {
+            "label": day.strftime("%d.%m"),
+            "count": bucket["count"],
+            "sum": bucket["sum"],
+            "height": int(round(float(bucket["sum"]) * 100 / float(max_day_sum))) if max_day_sum else 0,
+        }
+        for day, bucket in buckets.items()
+    ]
+
+    game_stats = db.query(
+        "SELECT i.НазваниеИгры AS game_name, COUNT(*) AS sales_count, SUM(z.Сумма) AS revenue "
+        "FROM " + join_sql(
+            "Заказы AS z",
+            ("Объявления AS o", "z.КодОбъявления = o.КодОбъявления"),
+            ("Товары AS t", "o.КодТовара = t.КодТовара"),
+            ("Игры AS i", "t.КодИгры = i.КодИгры"),
+        ) + " WHERE z.КодСтатуса = ? GROUP BY i.НазваниеИгры",
+        (done,),
+    )
+    game_stats.sort(key=lambda row: float(row["revenue"] or 0), reverse=True)
+    for row in game_stats:
+        row["revenue"] = D(row["revenue"] or 0)
+        row["share"] = int(round(float(row["revenue"]) * 100 / float(turnover))) if turnover else 0
+
+    seller_stats = db.query(
+        "SELECT o.КодПродавца AS seller_id, u.Логин AS seller_login, "
+        "COUNT(*) AS sales_count, SUM(z.Сумма) AS revenue "
+        "FROM " + join_sql(
+            "Заказы AS z",
+            ("Объявления AS o", "z.КодОбъявления = o.КодОбъявления"),
+            ("Пользователи AS u", "o.КодПродавца = u.КодПользователя"),
+        ) + " WHERE z.КодСтатуса = ? GROUP BY o.КодПродавца, u.Логин",
+        (done,),
+    )
+    seller_stats.sort(key=lambda row: float(row["revenue"] or 0), reverse=True)
+    seller_stats = seller_stats[:5]
+    for row in seller_stats:
+        row["revenue"] = D(row["revenue"] or 0)
+    attach_seller_names(db, seller_stats)
+
+    status_stats = db.query(
+        "SELECT st.НазваниеСтатуса AS status_name, COUNT(*) AS cnt "
+        "FROM " + join_sql("Заказы AS z", ("СтатусыЗаказов AS st", "z.КодСтатуса = st.КодСтатуса"))
+        + " GROUP BY st.НазваниеСтатуса")
+    status_stats.sort(key=lambda row: row["cnt"], reverse=True)
+
     roles = db.query("SELECT КодРоли AS role_id, НазваниеРоли AS role_name FROM Роли ORDER BY КодРоли")
-    return render_template("admin.html", users=users, listings=listings[:50], orders=orders_all[:50],
-                           stats=stats, roles=roles)
+    return render_template(
+        "admin.html", users=users, listings=listings[:50], orders=orders_all[:50],
+        stats=stats, roles=roles, sales_by_day=sales_by_day, game_stats=game_stats,
+        seller_stats=seller_stats, status_stats=status_stats, disputes=disputes,
+    )
+
+
+def csv_response(filename, header, rows):
+    """CSV с BOM и «;» — Excel открывает без настройки разделителя."""
+    buffer = io.StringIO()
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer, delimiter=";")
+    writer.writerow(header)
+    writer.writerows(rows)
+    return Response(
+        buffer.getvalue(),
+        content_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.get("/admin/export/orders.csv")
+@roles_required(ROLE_ADMIN)
+def admin_export_orders():
+    rows = get_db().query(f"SELECT {ORDER_COLS} FROM {ORDER_FROM} ORDER BY z.КодЗаказа DESC")
+    data = [
+        (row["order_id"], row["item_name"], row["buyer_login"], row["seller_login"],
+         row["qty"], row["order_sum"], row["created_at"], row["status_name"])
+        for row in rows
+    ]
+    header = ["№", "Товар", "Покупатель", "Продавец", "Количество", "Сумма", "Дата", "Статус"]
+    return csv_response("orders.csv", header, data)
+
+
+@app.get("/admin/export/users.csv")
+@roles_required(ROLE_ADMIN)
+def admin_export_users():
+    rows = get_db().query(
+        "SELECT u.КодПользователя AS user_id, u.Логин AS login, u.Email AS email, u.Баланс AS balance, "
+        "u.Заблокирован AS blocked, u.ДатаРегистрации AS created_at, r.НазваниеРоли AS role_name "
+        "FROM " + join_sql("Пользователи AS u", ("Роли AS r", "u.КодРоли = r.КодРоли"))
+        + " ORDER BY u.КодПользователя")
+    data = [
+        (row["user_id"], row["login"], row["email"], row["balance"], row["role_name"],
+         "да" if row["blocked"] else "нет", row["created_at"])
+        for row in rows
+    ]
+    header = ["№", "Логин", "Email", "Баланс", "Роль", "Заблокирован", "Дата регистрации"]
+    return csv_response("users.csv", header, data)
 
 
 @app.post("/admin/users/<int:user_id>/block")
@@ -986,6 +1463,40 @@ def admin_listing_remove(listing_id):
     return redirect(url_for("admin"))
 
 
+@app.post("/admin/orders/<int:order_id>/refund")
+@roles_required(ROLE_ADMIN)
+def admin_order_refund(order_id):
+    """Решение спора в пользу покупателя: деньги возвращаются на его баланс."""
+    db = get_db()
+    order = fetch_order(db, order_id)
+    if not order:
+        abort(404)
+    try:
+        refund_order(db, order, order_flow.DISPUTE)
+        flash(f"Спор по заказу №{order_id} решён: деньги возвращены покупателю.", "success")
+    except ShopError as error:
+        db.rollback()
+        flash(str(error), "error")
+    return redirect(url_for("admin", _anchor="disputes"))
+
+
+@app.post("/admin/orders/<int:order_id>/payout")
+@roles_required(ROLE_ADMIN)
+def admin_order_payout(order_id):
+    """Решение спора в пользу продавца: деньги уходят на его баланс."""
+    db = get_db()
+    order = fetch_order(db, order_id)
+    if not order:
+        abort(404)
+    try:
+        payout_order(db, order, order_flow.DISPUTE)
+        flash(f"Спор по заказу №{order_id} решён: деньги переведены продавцу.", "success")
+    except ShopError as error:
+        db.rollback()
+        flash(str(error), "error")
+    return redirect(url_for("admin", _anchor="disputes"))
+
+
 def clean_name(limit=60):
     name = " ".join(request.form.get("name", "").split())
     if not 2 <= len(name) <= limit:
@@ -1003,6 +1514,8 @@ def admin_catalog():
         try:
             if kind == "game":
                 name = clean_name()
+                if name not in ALLOWED_GAMES:
+                    raise ShopError("В каталог можно добавлять только CS2, Dota 2 и Rust.")
                 if db.one("SELECT КодИгры AS x FROM Игры WHERE НазваниеИгры = ?", (name,)):
                     raise ShopError("Такая игра уже есть.")
                 logo = request.files.get("logo")
@@ -1036,33 +1549,9 @@ def admin_catalog():
                     raise ShopError("Такая редкость уже есть.")
                 db.execute("INSERT INTO Редкости (НазваниеРедкости) VALUES (?)", (name,))
                 flash("Редкость добавлена.", "success")
-            elif kind == "item":
-                ref = reference_data(db)
-                game_id, category_id, rarity_id, name, description = parse_item_form(form, ref)
-                price_raw = form.get("price", "").strip()
-                price = parse_money(price_raw) if price_raw else None
-                qty = to_int(form.get("qty"), 1)
-                if price is not None and not 1 <= qty <= 9999:
-                    raise ShopError("Количество: от 1 до 9999.")
-                image = read_image(form, request.files)
-                item_id, created = find_or_create_item(db, game_id, category_id, rarity_id, name, description, image)
-                if price is not None:
-                    create_listing(db, g.user["user_id"], item_id, price, qty)
-                    flash(f"Скин {'добавлен в каталог и ' if created else ''}выставлен на продажу за {money_filter(price)}.",
-                          "success")
-                else:
-                    flash("Скин добавлен в каталог, но на витрине его нет: выставьте его на продажу с ценой."
-                          if created else "Такой скин уже есть: картинка и описание дополнены.", "success")
-            elif kind == "item_listing":
-                item_id = to_int(form.get("item_id"))
-                if not db.one("SELECT КодТовара AS x FROM Товары WHERE КодТовара = ?", (item_id,)):
-                    raise ShopError("Товар не найден.")
-                price = parse_money(form.get("price", ""))
-                qty = to_int(form.get("qty"), 1)
-                if qty is None or not 1 <= qty <= 9999:
-                    raise ShopError("Количество: от 1 до 9999.")
-                create_listing(db, g.user["user_id"], item_id, price, qty)
-                flash(f"Скин выставлен на продажу за {money_filter(price)}.", "success")
+            elif kind in ("item", "item_listing"):
+                raise ShopError("Товары добавляются только из инвентаря Steam: "
+                                "профиль → «Инвентарь Steam» → выберите предмет и укажите цену.")
             elif kind == "item_image":
                 item_id = to_int(form.get("item_id"))
                 if not db.one("SELECT КодТовара AS x FROM Товары WHERE КодТовара = ?", (item_id,)):
@@ -1080,9 +1569,11 @@ def admin_catalog():
         return redirect(url_for("admin_catalog", game=form.get("filter_game") or None))
 
     f_game = to_int(request.args.get("game"))
-    where, params = "", []
+    allowed_placeholders = ", ".join("?" for _ in ALLOWED_GAMES)
+    where, params = f" WHERE i.НазваниеИгры IN ({allowed_placeholders})", [*ALLOWED_GAMES]
     if f_game:
-        where, params = " WHERE t.КодИгры = ?", [f_game]
+        where += " AND t.КодИгры = ?"
+        params.append(f_game)
     items = db.query(
         "SELECT t.КодТовара AS item_id, t.Название AS item_name, t.URLИзображения AS image_url, "
         "i.НазваниеИгры AS game_name, k.НазваниеКатегории AS category_name, r.НазваниеРедкости AS rarity_name FROM "
@@ -1125,6 +1616,11 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.get("/faq")
+def faq():
+    return render_template("faq.html")
+
+
 # ---------------------------------------------------------- администратор по умолчанию
 DEFAULT_ADMIN = ("rrrr", "rrrr@skinmarket.local", "123456")
 
@@ -1133,15 +1629,39 @@ DEFAULT_CATALOG = {
             "Наклейки", "Кейсы"],
     "Dota 2": ["Герои", "Курьеры", "Наборы", "Эффекты", "Сундуки"],
     "Rust": ["Оружие", "Одежда", "Постройки", "Инструменты"],
-    "Team Fortress 2": ["Оружие", "Шляпы", "Косметика", "Наборы"],
-    "PUBG: Battlegrounds": ["Оружие", "Одежда", "Наборы", "Транспорт"],
-    "Apex Legends": ["Легенды", "Оружие", "Предметы"],
 }
 
 
-def ensure_catalog_defaults(db):
-    """Добавляет CS2 и Dota 2 с категориями, если их ещё нет. Повторный запуск ничего не дублирует."""
+def retire_games(db):
+    """Убирает игры, которые больше не входят в каталог.
+
+    Если в игре уже есть товары/заказы, историю не удаляем — просто снимаем
+    её объявления с продажи. Игры без товаров удаляются вместе с категориями.
+    """
     changed = False
+    for name in RETIRED_GAMES:
+        game = db.one("SELECT КодИгры AS game_id FROM Игры WHERE НазваниеИгры = ?", (name,))
+        if not game:
+            continue
+        game_id = game["game_id"]
+        has_items = db.one("SELECT КодТовара AS item_id FROM Товары WHERE КодИгры = ?", (game_id,))
+        if has_items:
+            db.execute(
+                "UPDATE Объявления SET КодСтатуса = ? WHERE КодТовара IN "
+                "(SELECT КодТовара FROM Товары WHERE КодИгры = ?)",
+                (lookup("listing", "Снято"), game_id))
+        else:
+            db.execute("DELETE FROM Категории WHERE КодИгры = ?", (game_id,))
+            db.execute("DELETE FROM Игры WHERE КодИгры = ?", (game_id,))
+        changed = True
+    if changed:
+        db.commit()
+    return changed
+
+
+def ensure_catalog_defaults(db):
+    """Добавляет CS2, Dota 2 и Rust с категориями, если их ещё нет."""
+    changed = retire_games(db)
     for game, categories in DEFAULT_CATALOG.items():
         row = db.one("SELECT КодИгры AS x FROM Игры WHERE НазваниеИгры = ?", (game,))
         if row:
@@ -1199,8 +1719,8 @@ def make_handler(code):
 for _code in ERRORS:
     app.register_error_handler(_code, make_handler(_code))
 
-from steam_auth import init_steam_auth
-from steam_inventory import init_steam_inventory
+from steam_auth import init_steam_auth, steam_profile
+from steam_inventory import init_steam_inventory, fetch_game_inventory, SteamInventoryError
 
 init_steam_auth(app, get_db)
 init_steam_inventory(app, get_db)

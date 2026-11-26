@@ -1,4 +1,5 @@
 """Steam OpenID 2.0 login, new-account creation and account linking."""
+import os
 import re
 import time
 import secrets
@@ -9,25 +10,81 @@ from flask import abort, flash, g, redirect, request, session, url_for
 from werkzeug.security import generate_password_hash
 
 STEAM_ENDPOINT = "https://steamcommunity.com/openid/login"
-PROFILE_NAME_CACHE = {}
+STEAM_API = "https://api.steampowered.com"
+PROFILE_CACHE = {}
 
-def steam_persona_name(steam_id):
-    cached = PROFILE_NAME_CACHE.get(steam_id)
+
+def _clean_persona_name(name):
+    """Убирает служебную приставку Steam из заголовка страницы профиля."""
+    name = re.sub(r"^\s*Steam Community\s*::\s*", "", name or "", flags=re.I)
+    name = re.sub(r"\s*::\s*Steam Community.*$", "", name, flags=re.I)
+    return name.strip()
+
+
+def steam_profile(steam_id):
+    """Ник, аватар и ссылка на профиль Steam (с кэшем на час).
+
+    Сначала пробуем официальный Web API, затем — публичную страницу профиля.
+    Ошибки сети не должны ломать сайт: шапка просто покажет локальный логин.
+    """
+    steam_id = str(steam_id or "").strip()
+    cached = PROFILE_CACHE.get(steam_id)
     if cached and time.time() - cached[0] < 3600:
         return cached[1]
-    try:
-        response = requests.get(f"https://steamcommunity.com/profiles/{steam_id}?l=english",
-                                headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
-        response.raise_for_status()
-        match = re.search(r'<meta\s+property="og:title"\s+content="([^"<>]+)"', response.text, re.I)
-        name = match.group(1).strip() if match else ""
-        name = re.sub(r"\s*::\s*Steam Community.*$", "", name).strip()
-        if name:
-            PROFILE_NAME_CACHE[steam_id] = (time.time(), name)
-            return name
-    except requests.RequestException:
-        pass
-    return None
+
+    profile = {
+        "name": None,
+        "avatar": None,
+        "profile_url": f"https://steamcommunity.com/profiles/{steam_id}/",
+    }
+    key = (os.getenv("STEAM_API_KEY") or "").strip()
+    if key:
+        try:
+            response = requests.get(
+                STEAM_API + "/ISteamUser/GetPlayerSummaries/v2/",
+                params={"key": key, "steamids": steam_id},
+                timeout=8,
+            )
+            response.raise_for_status()
+            players = response.json().get("response", {}).get("players", [])
+            if players:
+                player = players[0]
+                profile["name"] = _clean_persona_name(player.get("personaname")) or None
+                profile["avatar"] = (player.get("avatarfull") or player.get("avatarmedium")
+                                     or player.get("avatar"))
+        except (requests.RequestException, ValueError, KeyError):
+            pass
+
+    if not (profile["name"] and profile["avatar"]):
+        try:
+            response = requests.get(
+                profile["profile_url"] + "?l=english",
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=8,
+            )
+            response.raise_for_status()
+            if not profile["name"]:
+                match = re.search(
+                    r'<meta\s+property="og:title"\s+content="([^"<>]+)"',
+                    response.text, re.I,
+                )
+                profile["name"] = _clean_persona_name(match.group(1)) if match else None
+            if not profile["avatar"]:
+                match = re.search(
+                    r'<meta\s+property="og:image"\s+content="([^"<>]+)"',
+                    response.text, re.I,
+                )
+                profile["avatar"] = match.group(1).strip() if match else None
+        except requests.RequestException:
+            pass
+
+    PROFILE_CACHE[steam_id] = (time.time(), profile)
+    return profile
+
+
+def steam_persona_name(steam_id):
+    """Совместимость со старым кодом: только ник Steam."""
+    return steam_profile(steam_id)["name"]
 
 STEAM_ID_RE = re.compile(
     r"^https?://steamcommunity\.com/openid/id/([0-9]{17})/?$"
@@ -244,13 +301,32 @@ def init_steam_auth(app, get_db):
     @app.context_processor
     def inject_steam_display_name():
         user = g.get("user")
+        empty = {"steam_display_name": None, "steam_avatar": None, "steam_profile_url": None}
         if not user:
-            return {"steam_display_name": None}
+            return empty
         try:
-            row = get_db().one("SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?", (user["user_id"],))
-            return {"steam_display_name": steam_persona_name(row["SteamID"]) if row else None}
+            row = get_db().one(
+                "SELECT SteamID FROM SteamAccounts WHERE КодПользователя = ?",
+                (user["user_id"],),
+            )
+            if not row:
+                return empty
+            if app.config.get("TESTING"):
+                # В тестах не ходим в интернет ради шапки.
+                profile = {
+                    "name": None,
+                    "avatar": None,
+                    "profile_url": f"https://steamcommunity.com/profiles/{row['SteamID']}/",
+                }
+            else:
+                profile = steam_profile(row["SteamID"])
+            return {
+                "steam_display_name": profile.get("name"),
+                "steam_avatar": profile.get("avatar"),
+                "steam_profile_url": profile.get("profile_url"),
+            }
         except Exception:
-            return {"steam_display_name": None}
+            return empty
 
     @app.context_processor
     def inject_steam_link_status():

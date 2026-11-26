@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Сообщения{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span><span>Сообщения</span>
+</nav>
+<h1>Сообщения</h1>
+{% if conversations %}
+  <div class="conv-list">
+    {% for c in conversations %}
+      <a class="conv card" href="{{ url_for('order_detail', order_id=c.order_id) }}">
+        {% if c.counterpart_avatar %}
+          <img class="user-avatar" src="{{ c.counterpart_avatar }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+        {% else %}
+          <span class="user-avatar user-avatar-ph">{{ (c.counterpart_name or c.counterpart_login)|initials }}</span>
+        {% endif %}
+        <div class="conv-info">
+          <div class="conv-top">
+            <b>{{ c.counterpart_name or c.counterpart_login }}</b>
+            <span class="muted small">заказ №{{ c.order_id }}</span>
+          </div>
+          <div class="muted small">{{ c.item_name }}</div>
+          <div class="conv-preview">{{ c.last_text }}</div>
+        </div>
+        <div class="conv-side">
+          <span class="muted small">{{ c.last_at|dt }}</span>
+          {% if c.unread %}<span class="badge">{{ c.unread }}</span>{% endif %}
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty">
+    Сообщений пока нет. Чат открывается на странице заказа.
+    <a href="{{ url_for('orders') }}">Перейти к заказам</a>
+  </div>
+{% endif %}
+{% endblock %}

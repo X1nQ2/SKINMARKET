@@ -58,19 +58,31 @@
     {% if listings %}
     <div class="grid">
       {% for l in listings %}
-      <a class="skin card rarity-{{ l.rarity_name|rarity_cls }}" href="{{ url_for('listing_page', listing_id=l.listing_id) }}">
-        <div class="skin-img">
-          {% if l.image_url %}<img src="{{ l.image_url }}" alt="{{ l.item_name }}" loading="lazy">
-          {% else %}<span class="ph">{{ l.item_name|initials }}</span>{% endif %}
+      <div class="skin card rarity-{{ l.rarity_name|rarity_cls }}">
+        <a class="skin-main" href="{{ url_for('listing_page', listing_id=l.listing_id) }}">
+          <div class="skin-img">
+            {% if l.image_url %}<img src="{{ l.image_url }}" alt="{{ l.item_name }}" loading="lazy">
+            {% else %}<span class="ph">{{ l.item_name|initials }}</span>{% endif %}
+          </div>
+          <div class="skin-body">
+            <div class="skin-game">{{ l.game_name }} · {{ l.category_name }}</div>
+            <div class="skin-name">{{ l.item_name }}</div>
+            <div class="skin-meta"><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span><span class="muted">{{ l.qty }} шт.</span></div>
+            <div class="skin-price">{{ l.price|money }}</div>
+          </div>
+        </a>
+        <div class="skin-seller">
+          <a class="seller-line" href="{{ url_for('seller_page', seller_id=l.seller_id) }}"
+             title="Все объявления продавца {{ l.seller_name or l.seller_login }}">
+            {% if l.seller_avatar %}
+              <img class="seller-avatar" src="{{ l.seller_avatar }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+            {% else %}
+              <span class="seller-avatar seller-avatar-ph">{{ (l.seller_name or l.seller_login)|initials }}</span>
+            {% endif %}
+            <span class="seller-name">{{ l.seller_name or l.seller_login }}</span>
+          </a>
         </div>
-        <div class="skin-body">
-          <div class="skin-game">{{ l.game_name }} · {{ l.category_name }}</div>
-          <div class="skin-name">{{ l.item_name }}</div>
-          <div class="skin-meta"><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span><span class="muted">{{ l.qty }} шт.</span></div>
-          <div class="skin-price">{{ l.price|money }}</div>
-          <div class="muted small">Продавец: {{ l.seller_login }}</div>
-        </div>
-      </a>
+      </div>
       {% endfor %}
     </div>
     {% if pages > 1 %}

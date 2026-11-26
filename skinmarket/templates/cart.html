@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Корзина{% endblock %}
 {% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span><span>Корзина</span>
+</nav>
 <h1>Корзина</h1>
 {% if items %}
 <div class="card">
+  <div class="table-wrap">
   <table class="table">
     <thead><tr><th>Товар</th><th>Продавец</th><th>Цена</th><th>Кол-во</th><th>Сумма</th><th></th></tr></thead>
     <tbody>
@@ -11,7 +15,16 @@
       <tr>
         <td><a href="{{ url_for('listing_page', listing_id=i.listing_id) }}">{{ i.item_name }}</a>
             {% if not i.ok %}<div class="small err">Недоступно в таком количестве</div>{% endif %}</td>
-        <td>{{ i.seller_login }}</td>
+        <td>
+          <div class="user-cell">
+            {% if i.seller_avatar %}
+              <img class="user-avatar" src="{{ i.seller_avatar }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+            {% else %}
+              <span class="user-avatar user-avatar-ph">{{ (i.seller_name or i.seller_login)|initials }}</span>
+            {% endif %}
+            <span>{{ i.seller_name or i.seller_login }}</span>
+          </div>
+        </td>
         <td>{{ i.price|money }}</td>
         <td>{{ i.cart_qty }}</td>
         <td>{{ i.line|money }}</td>
@@ -25,6 +38,7 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
   <div class="cart-total">
     <div>Итого: <b>{{ total|money }}</b> · Ваш баланс: {{ user.balance|money }}</div>
     <form method="post" action="{{ url_for('cart_checkout') }}">

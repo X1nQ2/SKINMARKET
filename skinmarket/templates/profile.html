@@ -4,17 +4,51 @@
 <h1>Профиль</h1>
 <div class="two-col">
   <div class="card">
-    <h2>{{ steam_display_name or user.login }}</h2>
-    <p class="muted">{{ user.email }} · роль: {{ user.role_name }}</p>
+    <div class="profile-head">
+      {% if steam_avatar %}
+        <img class="profile-avatar" src="{{ steam_avatar }}" alt="Аватар Steam" referrerpolicy="no-referrer">
+      {% endif %}
+      <div>
+        <h2>{{ steam_display_name or user.login }}</h2>
+        <p class="muted">роль: {{ user.role_name }}</p>
+      </div>
+    </div>
     <div class="price-big">{{ user.balance|money }}</div>
     <p class="muted small">Демо-режим: пополнение и вывод не связаны с реальными платежами.</p>
     <h3>Steam</h3>
     {% if steam_linked %}
-      <p class="muted">Аккаунт Steam подключён · ID: {{ steam_linked }}</p>
-      <a class="btn btn-sm steam-login" href="{{ url_for('steam_inventory_page') }}">Открыть мой инвентарь Steam</a>
+      <p class="muted">Аккаунт Steam подключён.</p>
+      <div class="profile-steam-actions">
+        <a class="btn btn-sm steam-login" href="{{ url_for('steam_inventory_page') }}">Открыть мой инвентарь Steam</a>
+        {% if steam_profile_url %}
+          <a class="btn btn-ghost btn-sm" href="{{ steam_profile_url }}" target="_blank" rel="noopener">Профиль Steam</a>
+        {% endif %}
+      </div>
     {% else %}
       <p class="muted">Для просмотра инвентаря войдите через Steam.</p>
       <a class="btn btn-sm steam-login" href="{{ url_for('steam_link') }}">Подключить Steam</a>
+    {% endif %}
+    <h3>Steam Trade URL</h3>
+    {% if trade_url %}
+      <p class="muted small">Покупатель увидит эту ссылку на странице заказа, чтобы отправить предложение обмена.</p>
+      <p class="trade-url"><a href="{{ trade_url }}" target="_blank" rel="noopener">{{ trade_url }}</a></p>
+    {% else %}
+      <p class="muted small">Укажите ссылку обмена из Steam (Инвентарь → «Обмен» → «Создать ссылку»), чтобы покупатели могли передавать предметы.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('profile_trade_url') }}" class="trade-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Ссылка обмена Steam
+        <input type="url" name="trade_url" maxlength="{{ max_trade_url_len }}" value="{{ trade_url }}"
+               placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=...">
+      </label>
+      <button class="btn btn-sm" type="submit">{{ 'Обновить ссылку' if trade_url else 'Сохранить ссылку' }}</button>
+    </form>
+    {% if trade_url %}
+      <form method="post" action="{{ url_for('profile_trade_url') }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="trade_url" value="">
+        <button class="btn btn-ghost btn-sm" type="submit">Удалить ссылку</button>
+      </form>
     {% endif %}
     <form method="post" action="{{ url_for('topup') }}" class="inline-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -37,6 +71,7 @@
   <div class="card">
     <h2>История операций</h2>
     {% if transactions %}
+    <div class="table-wrap">
     <table class="table">
       <thead><tr><th>Дата</th><th>Операция</th><th>Заказ</th><th class="num">Сумма</th></tr></thead>
       <tbody>{% for t in transactions %}
@@ -44,6 +79,7 @@
         <td class="num {{ 'pos' if t.amount > 0 else 'neg' }}">{{ t.amount|money }}</td></tr>
       {% endfor %}</tbody>
     </table>
+    </div>
     {% else %}<p class="muted">Операций пока нет.</p>{% endif %}
   </div>
 </div>

@@ -1,46 +1,212 @@
 {% extends "base.html" %}
 {% block title %}Инвентарь Steam{% endblock %}
 {% block content %}
-<section class="page-head">
-  <h1>Мой инвентарь Steam</h1>
-  <p class="muted">Выберите игру, затем предмет из инвентаря. Для публикации укажите только цену.</p>
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('profile') }}">Профиль</a><span class="sep">/</span><span>Инвентарь Steam</span>
+</nav>
+<section class="inv-head">
+  <div>
+    <h1>Мой инвентарь Steam</h1>
+    <p class="muted">Выберите предмет, укажите цену и добавьте его в каталог. Количество всегда 1 шт.</p>
+  </div>
+  <span class="inv-head-note">Каталог: CS2 · Dota 2 · Rust</span>
 </section>
+
 {% if inventory_error %}
-  <div class="card"><p>{{ inventory_error }}</p>
-  {% if steam_id %}<p><a target="_blank" rel="noopener" href="https://steamcommunity.com/profiles/{{ steam_id }}/edit/settings">Настройки приватности Steam</a></p>{% endif %}</div>
+  <div class="card">
+    <p>{{ inventory_error }}</p>
+    {% if steam_id and 'приватност' in inventory_error %}
+      <p class="muted small">
+        Важно: в Steam должны быть открыты «Общие сведения» и «Инвентарь».
+        После изменения настроек вернитесь сюда и обновите страницу.
+      </p>
+      <p>
+        <a class="btn btn-sm" target="_blank" rel="noopener"
+           href="https://steamcommunity.com/profiles/{{ steam_id }}/edit/settings">Открыть настройки приватности Steam</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('steam_inventory_page', appid=selected_appid or None) }}">Проверить снова</a>
+      </p>
+    {% endif %}
+  </div>
 {% elif games %}
-  <form method="get" class="card stack-form" style="max-width:520px">
-    <label>Игра Steam
-      <select name="appid" onchange="this.form.submit()">
-        {% for game in games %}<option value="{{ game.appid }}" {{ 'selected' if selected_appid == game.appid|string }}>{{ game.name }}</option>{% endfor %}
+  <nav class="inv-games" aria-label="Игры Steam">
+    {% for game in games %}
+      <a class="inv-game {{ 'active' if selected_appid == game.appid|string else '' }} {{ 'is-missing' if not game.owned else '' }}"
+         href="{{ url_for('steam_inventory_page', appid=game.appid) }}"
+         title="{{ game.name }}{{ ' — игры нет в вашей библиотеке Steam' if not game.owned else '' }}">{{ game.name }}{% if not game.owned %}<span class="inv-game-note">нет в библиотеке</span>{% endif %}</a>
+    {% endfor %}
+  </nav>
+
+  {% if game_error %}
+    <div class="card">
+      <p>{{ game_error }}</p>
+      {% if steam_id and 'приватност' in game_error %}
+        <p class="muted small">
+          Важно: в Steam должны быть открыты «Общие сведения» и «Инвентарь».
+          После изменения настроек вернитесь сюда и обновите страницу.
+        </p>
+        <p>
+          <a class="btn btn-sm" target="_blank" rel="noopener"
+             href="https://steamcommunity.com/profiles/{{ steam_id }}/edit/settings">Открыть настройки приватности Steam</a>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('steam_inventory_page', appid=selected_appid or None) }}">Проверить снова</a>
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <form method="get" action="{{ url_for('steam_inventory_page') }}" class="inv-toolbar">
+    <input type="hidden" name="appid" value="{{ selected_appid }}">
+    <label class="inv-search">Поиск по предметам
+      <input type="search" name="q" value="{{ q }}" maxlength="80"
+             placeholder="Например, AK-47, Rifle или нож">
+    </label>
+    <label>Редкость
+      <select name="rarity">
+        <option value="">Все редкости</option>
+        {% for rarity in rarities %}
+          <option value="{{ rarity }}" {{ 'selected' if rarity_filter == rarity else '' }}>{{ rarity }}</option>
+        {% endfor %}
       </select>
     </label>
-    <noscript><button class="btn" type="submit">Показать инвентарь</button></noscript>
+    <label class="inv-check">
+      <input type="checkbox" name="tradable" value="1" {{ 'checked' if tradable_only else '' }}>
+      Только передаваемые
+    </label>
+    <button class="btn btn-sm" type="submit">Показать</button>
+    {% if q or rarity_filter or tradable_only %}
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('steam_inventory_page', appid=selected_appid) }}">Сбросить</a>
+    {% endif %}
   </form>
-  {% if selected_game %}<p class="muted">Игра: {{ selected_game.name }} · найдено предметов: {{ items|length }}</p>{% endif %}
-  {% if not items %}<div class="card"><p>В этой игре нет доступных предметов инвентаря или инвентарь скрыт настройками Steam.</p></div>{% endif %}
-  <div class="catalog-grid">
-  {% for item in items %}
-    <article class="card listing-card">
-      {% if item.image %}<img class="listing-image" src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">{% else %}<div class="listing-image"></div>{% endif %}
-      <div class="listing-body">
-        <h3>{{ item.name }}</h3><p class="muted small">{{ item.type }}</p>
-        {% if item.assetid in imported %}<span class="badge">Уже выставлен</span>
-        {% elif not item.tradable %}<span class="badge">Нельзя передать</span>
-        {% else %}
-          <form method="post" action="{{ url_for('list_steam_item') }}" class="stack-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="appid" value="{{ selected_appid }}">
-            <input type="hidden" name="game_name" value="{{ selected_game.name }}">
-            <input type="hidden" name="assetid" value="{{ item.assetid }}">
-            <label>Цена, ₽<input type="number" name="price" min="0.01" max="10000000" step="0.01" placeholder="Например, 150" required></label>
-            <button class="btn btn-block" type="submit">Добавить в каталог</button>
-          </form>
-        {% endif %}
-      </div>
-    </article>
-  {% endfor %}
+
+  <div class="inv-summary">
+    <span>Найдено: <b>{{ total_items }}</b>{% if total_items != all_total %} из {{ all_total }}{% endif %}</span>
+    {% if selected_game %}<span>{{ selected_game.name }} · показано {{ items|length }} на странице</span>{% endif %}
   </div>
-{% else %}<div class="card"><p>Список игр Steam не получен.</p></div>{% endif %}
-<p class="hint">Steam показывает только игры и предметы, доступные через публичный инвентарь. Передача покупателю пока выполняется вручную через Steam Trade Offer.</p>
+
+  {% if items %}
+  <div class="inv-browser">
+    <div class="inv-left">
+      <div class="inv-grid">
+        {% for item in items %}
+          {% set state = 'imported' if item.assetid in imported else ('blocked' if not item.tradable else 'available') %}
+          {% set item_rarity = item.rarity_ru or item.rarity %}
+          <a class="inv-tile rarity-{{ item_rarity|rarity_cls }} {{ 'is-selected' if selected_item and selected_item.assetid == item.assetid else '' }}"
+             href="{{ url_for('steam_inventory_page', appid=selected_appid, q=q or None,
+                              rarity=rarity_filter or None, tradable='1' if tradable_only else None,
+                              page=page, item=item.assetid) }}"
+             data-appid="{{ selected_appid }}" data-assetid="{{ item.assetid }}"
+             data-name="{{ item.name }}" data-type="{{ item.type or 'Предмет Steam' }}"
+             data-rarity="{{ item_rarity }}" data-rarity-ru="{{ item_rarity }}"
+             data-rarity-cls="{{ item_rarity|rarity_cls }}"
+             data-image="{{ item.image or '' }}" data-state="{{ state }}"
+             title="{{ item.name }}">
+            {% if item.image %}
+              <img src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">
+            {% else %}
+              <span class="inv-tile-ph">{{ item.name|initials }}</span>
+            {% endif %}
+            {% if state == 'imported' %}
+              <span class="inv-tile-flag">В продаже</span>
+            {% elif state == 'blocked' %}
+              <span class="inv-tile-flag is-blocked">Не передаётся</span>
+            {% endif %}
+            <span class="inv-tile-name">{{ item.name }}</span>
+          </a>
+        {% endfor %}
+      </div>
+
+      {% if pages > 1 %}
+      <nav class="inv-pager" aria-label="Страницы инвентаря">
+        {% if page > 1 %}
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('steam_inventory_page', appid=selected_appid,
+                                                              q=q or None, rarity=rarity_filter or None,
+                                                              tradable='1' if tradable_only else None,
+                                                              page=page-1) }}">&larr; Назад</a>
+        {% else %}
+          <span class="btn btn-ghost btn-sm is-disabled">&larr; Назад</span>
+        {% endif %}
+        <span class="inv-page-info">Страница <b>{{ page }}</b> из {{ pages }}</span>
+        {% if page < pages %}
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('steam_inventory_page', appid=selected_appid,
+                                                              q=q or None, rarity=rarity_filter or None,
+                                                              tradable='1' if tradable_only else None,
+                                                              page=page+1) }}">Вперёд &rarr;</a>
+        {% else %}
+          <span class="btn btn-ghost btn-sm is-disabled">Вперёд &rarr;</span>
+        {% endif %}
+      </nav>
+      {% endif %}
+    </div>
+
+    {% if selected_item %}
+      {% set selected_state = 'imported' if selected_item.assetid in imported else ('blocked' if not selected_item.tradable else 'available') %}
+      {% set selected_rarity = selected_item.rarity_ru or selected_item.rarity %}
+      <aside class="inv-detail" id="inv-detail" aria-live="polite">
+        <div class="inv-detail-img rarity-{{ selected_rarity|rarity_cls }}" id="inv-detail-img-wrap">
+          <img id="inv-detail-image" src="{{ selected_item.image or '' }}"
+               alt="{{ selected_item.name }}" {{ 'hidden' if not selected_item.image else '' }}>
+          <span class="inv-ph" id="inv-detail-image-ph"
+                {{ 'hidden' if selected_item.image else '' }}>{{ selected_item.name|initials }}</span>
+        </div>
+        <h2 id="inv-detail-name">{{ selected_item.name }}</h2>
+        <p class="muted small" id="inv-detail-type">{{ selected_item.type or 'Предмет Steam' }}</p>
+        <div class="inv-detail-tags">
+          <span class="tag tag-{{ selected_rarity|rarity_cls }}" id="inv-detail-rarity">{{ selected_rarity }}</span>
+          {% if selected_game %}<span class="tag">{{ selected_game.name }}</span>{% endif %}
+        </div>
+        <p class="inv-detail-state" id="inv-detail-state">
+          {% if selected_state == 'imported' %}Этот предмет уже добавлен в SKINMARKET и выставлен на продажу.
+          {% elif selected_state == 'blocked' %}Этот предмет нельзя передать, поэтому добавить его в каталог нельзя.
+          {% else %}Предмет можно добавить в каталог. Укажите цену — объявление сразу появится на витрине.{% endif %}
+        </p>
+        <form method="post" action="{{ url_for('list_steam_item') }}" class="inv-detail-form"
+              id="inv-detail-form" {{ 'hidden' if selected_state != 'available' else '' }}>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="appid" value="{{ selected_appid }}">
+          <input type="hidden" name="assetid" value="{{ selected_item.assetid }}">
+          <div class="inv-detail-grid">
+            <label>Категория
+              <input type="text" name="category" id="inv-detail-category" list="inv-category-options"
+                     maxlength="40" placeholder="Предметы (по умолчанию)" autocomplete="off">
+              <datalist id="inv-category-options">
+                {% for name in category_options %}<option value="{{ name }}"></option>{% endfor %}
+              </datalist>
+            </label>
+            <label>Редкость
+              <select name="rarity" id="inv-detail-rarity-select">
+                {% for name in rarity_options %}
+                  <option value="{{ name }}" {{ 'selected' if selected_item and name == (selected_item.rarity_ru or 'Обычное') else '' }}>{{ name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <label>Цена, ₽
+            <input type="number" name="price" id="inv-detail-price"
+                   min="0.01" max="10000000" step="0.01" placeholder="Например, 150" required>
+          </label>
+          <button class="btn btn-block" type="submit">Добавить в каталог</button>
+        </form>
+        <p class="hint">Один предмет из инвентаря — одно объявление с количеством 1 шт.
+          Передача покупателю выполняется вручную через Steam Trade Offer.</p>
+      </aside>
+    {% endif %}
+  </div>
+  {% else %}
+    <div class="card empty">
+      {% if selected_game and not selected_game.owned %}
+        <p>Игры {{ selected_game.name }} нет в вашей библиотеке Steam, поэтому предметов для показа нет.</p>
+        <p class="muted small">Если игра есть в библиотеке, проверьте, что в настройках Steam открыты «Детали игр» и «Инвентарь».</p>
+      {% elif not game_error %}
+        <p>По вашему запросу ничего не найдено.</p>
+        {% if q or rarity_filter or tradable_only %}
+          <p><a class="btn btn-ghost btn-sm" href="{{ url_for('steam_inventory_page', appid=selected_appid) }}">Сбросить фильтры</a></p>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="card"><p>Список игр Steam не получен.</p></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/inventory.js') }}"></script>
 {% endblock %}

@@ -1,9 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Ошибка {{ code }}{% endblock %}
 {% block content %}
-<div class="card empty">
-  <h1>{{ code }}</h1>
+<div class="card empty error-page">
+  <div class="error-code">{{ code }}</div>
+  <h1>{% if code == 404 %}Страница не найдена{% else %}Что-то пошло не так{% endif %}</h1>
   <p>{{ message }}</p>
-  <a class="btn" href="{{ url_for('catalog') }}">В каталог</a>
+  {% if code == 404 %}
+    <form method="get" action="{{ url_for('catalog') }}" class="error-search">
+      <input type="search" name="q" maxlength="60" placeholder="Найти скин, игру или категорию">
+      <button class="btn" type="submit">Найти</button>
+    </form>
+    <p class="muted small">Или посмотрите <a href="{{ url_for('catalog') }}">весь каталог</a>.</p>
+  {% endif %}
+  <a class="btn btn-ghost" href="{{ url_for('catalog') }}">В каталог</a>
 </div>
 {% endblock %}

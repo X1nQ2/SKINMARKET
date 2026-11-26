@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Мои объявления{% endblock %}
 {% block content %}
+<nav class="breadcrumbs" aria-label="Навигация">
+  <a href="{{ url_for('catalog') }}">Каталог</a><span class="sep">/</span><span>Мои объявления</span>
+</nav>
 <div class="head-row">
   <h1>Мои объявления</h1>
   <div>
@@ -8,25 +11,42 @@
     <a class="btn" href="{{ url_for('sell_new') }}">Добавить из инвентаря Steam</a>
   </div>
 </div>
+<p class="muted small">Один предмет из инвентаря Steam — одно объявление с количеством 1 шт. Чтобы снять предмет с продажи, нажмите «Снять»: он снова станет доступен в инвентаре.</p>
 {% if listings %}
 <div class="card">
+  <div class="table-wrap">
   <table class="table">
-    <thead><tr><th>Товар</th><th>Игра</th><th>Статус</th><th>Цена и количество</th><th></th></tr></thead>
+    <thead><tr><th>Товар</th><th>Игра</th><th>Категория и редкость</th><th>Статус</th><th>Цена</th><th>Количество</th><th></th></tr></thead>
     <tbody>
     {% for l in listings %}
       <tr>
-        <td><a href="{{ url_for('listing_page', listing_id=l.listing_id) }}">{{ l.item_name }}</a>
-            <div><span class="tag tag-{{ l.rarity_name|rarity_cls }}">{{ l.rarity_name }}</span></div></td>
+        <td><a href="{{ url_for('listing_page', listing_id=l.listing_id) }}">{{ l.item_name }}</a></td>
         <td>{{ l.game_name }}</td>
+        <td>
+          <form method="post" action="{{ url_for('sell_update', listing_id=l.listing_id) }}" class="inline-form edit-taxonomy">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="category" aria-label="Категория">
+              {% for c in l.categories %}
+                <option value="{{ c.category_name }}" {{ 'selected' if c.category_id == l.category_id else '' }}>{{ c.category_name }}</option>
+              {% endfor %}
+            </select>
+            <select name="rarity" aria-label="Редкость">
+              {% for r in rarity_options %}
+                <option value="{{ r }}" {{ 'selected' if r == l.rarity_name else '' }}>{{ r }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-sm" type="submit">Сохранить</button>
+          </form>
+        </td>
         <td>{{ l.status_name }}</td>
         <td>
           <form method="post" action="{{ url_for('sell_update', listing_id=l.listing_id) }}" class="inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" inputmode="decimal" name="price" value="{{ l.price }}" size="8" aria-label="Цена">
-            <input type="number" name="qty" value="{{ l.qty }}" min="0" max="9999" aria-label="Количество">
             <button class="btn btn-sm" type="submit">Сохранить</button>
           </form>
         </td>
+        <td>1 шт.</td>
         <td>
           {% if l.status_name != 'Снято' %}
           <form method="post" action="{{ url_for('sell_remove', listing_id=l.listing_id) }}">
@@ -39,8 +59,9 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% else %}
-<div class="card empty">Объявлений пока нет. <a href="{{ url_for('sell_new') }}">Создать первое</a></div>
+<div class="card empty">Объявлений пока нет. <a href="{{ url_for('sell_new') }}">Добавить предмет из инвентаря Steam</a></div>
 {% endif %}
 {% endblock %}
