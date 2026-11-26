@@ -1,0 +1,253 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="skinmarket-er" name="SKINMARKET ER">
+    <mxGraphModel dx="1790" dy="994" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="1032" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c3" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Игры" vertex="1">
+          <mxGeometry height="82" width="250" x="40" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" parent="c3" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код игры : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" parent="c3" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название игры : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Категории" vertex="1">
+          <mxGeometry height="106" width="250" x="380" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" parent="c6" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код категории : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" parent="c6" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код игры : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" parent="c6" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название категории : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Редкости" vertex="1">
+          <mxGeometry height="82" width="250" x="720" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="c11" parent="c10" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код редкости : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c12" parent="c10" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название редкости : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c13" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Товары (скины)" vertex="1">
+          <mxGeometry height="202" width="250" x="380" y="226" as="geometry" />
+        </mxCell>
+        <mxCell id="c14" parent="c13" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код товара : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c15" parent="c13" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код игры : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c16" parent="c13" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код категории : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c17" parent="c13" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код редкости : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="c18" parent="c13" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c19" parent="c13" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Описание : Длинный текст" vertex="1">
+          <mxGeometry height="24" width="250" y="154" as="geometry" />
+        </mxCell>
+        <mxCell id="c20" parent="c13" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      URL изображения : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="178" as="geometry" />
+        </mxCell>
+        <mxCell id="c21" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Объявления" vertex="1">
+          <mxGeometry height="202" width="250" x="720" y="226" as="geometry" />
+        </mxCell>
+        <mxCell id="c22" parent="c21" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код объявления : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c23" parent="c21" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код продавца : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c24" parent="c21" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код товара : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c25" parent="c21" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Цена : Деньги" vertex="1">
+          <mxGeometry height="24" width="250" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="c26" parent="c21" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Количество : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c27" parent="c21" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код статуса : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="154" as="geometry" />
+        </mxCell>
+        <mxCell id="c28" parent="c21" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Дата создания : Дата/время" vertex="1">
+          <mxGeometry height="24" width="250" y="178" as="geometry" />
+        </mxCell>
+        <mxCell id="c29" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Статусы объявлений" vertex="1">
+          <mxGeometry height="82" width="250" x="1060" y="226" as="geometry" />
+        </mxCell>
+        <mxCell id="c30" parent="c29" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код статуса : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c31" parent="c29" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название статуса : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c32" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Роли" vertex="1">
+          <mxGeometry height="82" width="250" x="40" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="c33" parent="c32" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код роли : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c34" parent="c32" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название роли : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c35" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Пользователи" vertex="1">
+          <mxGeometry height="226" width="250" x="380" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="c36" parent="c35" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код пользователя : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c37" parent="c35" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Логин : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c38" parent="c35" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Email : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c39" parent="c35" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Хеш пароля : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="c40" parent="c35" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код роли : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c41" parent="c35" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Баланс : Деньги" vertex="1">
+          <mxGeometry height="24" width="250" y="154" as="geometry" />
+        </mxCell>
+        <mxCell id="c42" parent="c35" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Дата регистрации : Дата/время" vertex="1">
+          <mxGeometry height="24" width="250" y="178" as="geometry" />
+        </mxCell>
+        <mxCell id="c43" parent="c35" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Заблокирован : Логический" vertex="1">
+          <mxGeometry height="24" width="250" y="202" as="geometry" />
+        </mxCell>
+        <mxCell id="c44" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Заказы" vertex="1">
+          <mxGeometry height="202" width="250" x="720" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="c45" parent="c44" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код заказа : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c46" parent="c44" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код покупателя : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c47" parent="c44" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код объявления : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c48" parent="c44" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Количество : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="c49" parent="c44" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Сумма : Деньги" vertex="1">
+          <mxGeometry height="24" width="250" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c50" parent="c44" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Дата заказа : Дата/время" vertex="1">
+          <mxGeometry height="24" width="250" y="154" as="geometry" />
+        </mxCell>
+        <mxCell id="c51" parent="c44" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код статуса : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="178" as="geometry" />
+        </mxCell>
+        <mxCell id="c52" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Статусы заказов" vertex="1">
+          <mxGeometry height="82" width="250" x="1060" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="c53" parent="c52" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код статуса : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c54" parent="c52" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Название статуса : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c55" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Транзакции" vertex="1">
+          <mxGeometry height="178" width="250" x="380" y="814" as="geometry" />
+        </mxCell>
+        <mxCell id="c56" parent="c55" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код транзакции : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c57" parent="c55" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код пользователя : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c58" parent="c55" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код заказа : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c59" parent="c55" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Тип : Текст" vertex="1">
+          <mxGeometry height="24" width="250" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="c60" parent="c55" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Сумма : Деньги" vertex="1">
+          <mxGeometry height="24" width="250" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c61" parent="c55" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Дата : Дата/время" vertex="1">
+          <mxGeometry height="24" width="250" y="154" as="geometry" />
+        </mxCell>
+        <mxCell id="c62" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=34;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;arcSize=6;fillColor=#EEEDFE;strokeColor=#3C3489;fontColor=#26215C;fontSize=13;swimlaneFillColor=#FFFFFF;" value="Отзывы" vertex="1">
+          <mxGeometry height="154" width="250" x="720" y="814" as="geometry" />
+        </mxCell>
+        <mxCell id="c63" parent="c62" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;fontStyle=1;" value="PK  Код отзыва : Счётчик" vertex="1">
+          <mxGeometry height="24" width="250" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c64" parent="c62" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="FK  Код заказа : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="58" as="geometry" />
+        </mxCell>
+        <mxCell id="c65" parent="c62" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Оценка : Число" vertex="1">
+          <mxGeometry height="24" width="250" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="c66" parent="c62" style="text;strokeColor=none;fillColor=#F6F5F0;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Комментарий : Длинный текст" vertex="1">
+          <mxGeometry height="24" width="250" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="c67" parent="c62" style="text;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;" value="      Дата отзыва : Дата/время" vertex="1">
+          <mxGeometry height="24" width="250" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c68" edge="1" parent="1" source="c32" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c35">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c69" edge="1" parent="1" source="c35" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c21">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c70" edge="1" parent="1" source="c35" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c44">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c71" edge="1" parent="1" source="c35" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c55">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c72" edge="1" parent="1" source="c3" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c6">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c73" edge="1" parent="1" source="c3" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c13">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c74" edge="1" parent="1" source="c6" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c13">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c75" edge="1" parent="1" source="c10" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c13">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c76" edge="1" parent="1" source="c13" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c21">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c77" edge="1" parent="1" source="c29" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c21">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c78" edge="1" parent="1" source="c21" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c44">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c79" edge="1" parent="1" source="c52" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c44">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c80" edge="1" parent="1" source="c44" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToMany;startArrow=ERzeroToOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c55">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c81" edge="1" parent="1" source="c44" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERzeroToOne;startArrow=ERmandOne;endFill=0;startFill=0;strokeColor=#5F5E5A;rounded=0;" target="c62">
+          <mxGeometry height="100" relative="1" width="100" as="geometry" />
+        </mxCell>
+        <mxCell id="YVS0rbtghQjMNAVp50kS-3" parent="1" style="html=1;whiteSpace=wrap;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;code dir=&quot;ltr&quot;&gt;FK&lt;/code&gt; — внешний&lt;/font&gt;" vertex="1">
+          <mxGeometry height="82" width="180" x="40" y="732" as="geometry" />
+        </mxCell>
+        <mxCell id="YVS0rbtghQjMNAVp50kS-4" parent="1" style="html=1;whiteSpace=wrap;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;code dir=&quot;ltr&quot; style=&quot;&quot;&gt;PK&lt;/code&gt; — первичный ключ&lt;/font&gt;" vertex="1">
+          <mxGeometry height="82" width="180" x="40" y="636" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
